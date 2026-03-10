@@ -68,6 +68,7 @@ async function extractKeywords(titles) {
   );
   const data = await res.json();
   const text = data.result?.message?.content || '[]';
+  console.log('[CLOVA 1차] raw:', text.slice(0, 200));
   try {
     return JSON.parse(text.replace(/```json|```/g, '').trim());
   } catch {
@@ -101,6 +102,7 @@ async function getSearchTrends(keywords) {
       }
     );
     const data = await res.json();
+    console.log('[DataLab] chunk', i, 'response:', JSON.stringify(data).slice(0, 300));
     if (data.results) {
       for (const result of data.results) {
         const values = result.data.map(d => d.ratio);
