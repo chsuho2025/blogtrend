@@ -4,23 +4,26 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>블로그 트렌드 레이더</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --green: #03C75A;
-      --green-dim: #02a34c;
-      --green-glow: rgba(3, 199, 90, 0.15);
-      --green-subtle: rgba(3, 199, 90, 0.06);
-      --bg: #0a0a0a;
-      --bg2: #111111;
-      --bg3: #181818;
-      --border: rgba(255,255,255,0.07);
-      --text: #f0f0f0;
-      --text-muted: #666;
-      --text-dim: #999;
-      --red: #ff4757;
-      --yellow: #ffa502;
+      --green-light: #e8f9f0;
+      --green-mid: #b3efd1;
+      --red: #F04452;
+      --red-light: #fff0f1;
+      --blue: #1A73E8;
+      --bg: #F7F8FA;
+      --white: #ffffff;
+      --border: #E5E8ED;
+      --border-light: #F0F2F5;
+      --text: #191F28;
+      --text-sub: #4E5968;
+      --text-muted: #8B95A1;
+      --text-placeholder: #B0B8C1;
+      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -29,20 +32,24 @@
       background: var(--bg);
       color: var(--text);
       font-family: 'Noto Sans KR', sans-serif;
-      min-height: 100vh;
-      overflow-x: hidden;
+      font-size: 14px;
+      line-height: 1.5;
     }
 
     /* HEADER */
     header {
+      background: var(--white);
+      border-bottom: 1px solid var(--border);
       position: sticky;
       top: 0;
       z-index: 100;
-      background: rgba(10,10,10,0.92);
-      backdrop-filter: blur(20px);
-      border-bottom: 1px solid var(--border);
-      padding: 0 32px;
-      height: 64px;
+    }
+
+    .header-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 56px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -51,92 +58,84 @@
     .logo {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: 8px;
     }
 
-    .logo-icon {
-      width: 32px;
-      height: 32px;
+    .logo-mark {
+      width: 28px;
+      height: 28px;
       background: var(--green);
-      border-radius: 8px;
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
+      font-size: 14px;
+    }
+
+    .logo-name {
       font-size: 16px;
+      font-weight: 800;
+      color: var(--text);
+      letter-spacing: -0.5px;
     }
 
-    .logo-text {
-      font-size: 15px;
+    .logo-beta {
+      font-size: 10px;
       font-weight: 700;
-      letter-spacing: -0.3px;
-    }
-
-    .logo-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-      font-weight: 300;
-      letter-spacing: 0.5px;
-      margin-top: 1px;
+      color: var(--green);
+      background: var(--green-light);
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.3px;
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 12px;
     }
 
-    .live-badge {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--green-subtle);
-      border: 1px solid rgba(3,199,90,0.2);
-      border-radius: 20px;
-      padding: 5px 12px;
-      font-size: 11px;
-      font-weight: 500;
-      color: var(--green);
-      letter-spacing: 0.5px;
+    .update-info {
+      font-size: 12px;
+      color: var(--text-muted);
     }
 
     .live-dot {
+      display: inline-block;
       width: 6px;
       height: 6px;
       background: var(--green);
       border-radius: 50%;
+      margin-right: 5px;
       animation: pulse 1.5s infinite;
     }
 
     @keyframes pulse {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.8); }
-    }
-
-    .update-time {
-      font-size: 11px;
-      color: var(--text-muted);
-      font-family: 'DM Mono', monospace;
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
     }
 
     .refresh-btn {
-      background: var(--bg3);
+      height: 34px;
+      padding: 0 14px;
+      background: var(--white);
       border: 1px solid var(--border);
-      color: var(--text-dim);
-      padding: 7px 14px;
-      border-radius: 8px;
-      font-size: 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-sub);
       cursor: pointer;
       font-family: 'Noto Sans KR', sans-serif;
-      transition: all 0.2s;
+      transition: all 0.15s;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
 
     .refresh-btn:hover {
       border-color: var(--green);
       color: var(--green);
-      background: var(--green-subtle);
+      background: var(--green-light);
     }
 
     .refresh-btn.loading {
@@ -144,190 +143,188 @@
       pointer-events: none;
     }
 
-    .refresh-btn .spin {
-      display: inline-block;
-      animation: spin 1s linear infinite;
-    }
-
     @keyframes spin {
       from { transform: rotate(0deg); }
       to { transform: rotate(360deg); }
     }
 
-    /* MAIN LAYOUT */
-    main {
+    .spin { animation: spin 0.8s linear infinite; display: inline-block; }
+
+    /* TICKER BAR */
+    .ticker-bar {
+      background: var(--white);
+      border-bottom: 1px solid var(--border-light);
+      padding: 0 24px;
+    }
+
+    .ticker-inner {
       max-width: 1200px;
       margin: 0 auto;
-      padding: 40px 32px;
-    }
-
-    /* SECTION TITLE */
-    .section-header {
       display: flex;
-      align-items: baseline;
-      gap: 12px;
-      margin-bottom: 24px;
+      gap: 0;
+      overflow-x: auto;
+      scrollbar-width: none;
     }
 
-    .section-title {
+    .ticker-inner::-webkit-scrollbar { display: none; }
+
+    .ticker-item {
+      padding: 10px 24px 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      white-space: nowrap;
+      border-right: 1px solid var(--border-light);
+      margin-right: 24px;
       font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
+    }
+
+    .ticker-item:last-child { border-right: none; }
+
+    .ticker-label {
       color: var(--text-muted);
+      font-size: 12px;
     }
 
-    .section-line {
-      flex: 1;
-      height: 1px;
-      background: var(--border);
+    .ticker-val {
+      font-weight: 700;
+      color: var(--text);
+      font-family: 'Roboto Mono', monospace;
     }
 
-    /* TOP 5 CHART */
-    .chart-section {
-      background: var(--bg2);
+    .up { color: var(--red); }
+    .down { color: var(--blue); }
+    .flat-color { color: var(--text-muted); }
+
+    /* MAIN */
+    .main-wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px;
+      display: grid;
+      grid-template-columns: 1fr 360px;
+      gap: 20px;
+    }
+
+    /* CARD */
+    .card {
+      background: var(--white);
       border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      margin-bottom: 40px;
-      position: relative;
+      border-radius: 12px;
+      box-shadow: var(--shadow);
       overflow: hidden;
     }
 
-    .chart-section::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, var(--green), transparent);
-    }
-
-    .chart-header {
+    .card-header {
+      padding: 18px 20px 14px;
+      border-bottom: 1px solid var(--border-light);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 24px;
     }
 
-    .chart-title {
-      font-size: 16px;
+    .card-title {
+      font-size: 15px;
       font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.3px;
+    }
+
+    .card-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 2px;
     }
 
     .period-tabs {
       display: flex;
-      gap: 4px;
-      background: var(--bg3);
-      border-radius: 8px;
-      padding: 3px;
+      gap: 2px;
     }
 
     .period-tab {
-      padding: 5px 12px;
-      border-radius: 6px;
+      padding: 4px 10px;
+      border-radius: 4px;
       font-size: 12px;
+      font-weight: 500;
       cursor: pointer;
       color: var(--text-muted);
-      transition: all 0.2s;
-      border: none;
       background: none;
+      border: none;
       font-family: 'Noto Sans KR', sans-serif;
+      transition: all 0.15s;
     }
 
-    .period-tab.active {
-      background: var(--green);
-      color: #000;
-      font-weight: 700;
-    }
+    .period-tab:hover { background: var(--bg); color: var(--text); }
+    .period-tab.active { background: var(--green); color: #fff; font-weight: 700; }
 
+    /* CHART */
     .chart-wrap {
-      height: 220px;
-      position: relative;
+      padding: 20px;
+      height: 200px;
     }
 
-    /* RANKING */
-    .ranking-section {
+    /* TABLE */
+    .rank-table {
+      width: 100%;
+    }
+
+    .rank-table-header {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-    }
-
-    .ranking-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      overflow: hidden;
-    }
-
-    .ranking-card-header {
-      padding: 20px 24px 16px;
-      border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .ranking-card-title {
-      font-size: 13px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-    }
-
-    .ranking-card-sub {
+      grid-template-columns: 48px 1fr 100px 80px 64px;
+      padding: 8px 20px;
       font-size: 11px;
       color: var(--text-muted);
+      font-weight: 500;
+      border-bottom: 1px solid var(--border-light);
+      letter-spacing: 0.3px;
     }
 
-    .keyword-list {
-      padding: 8px 0;
-    }
+    .rank-table-header span:not(:first-child) { text-align: right; }
 
-    .keyword-item {
-      display: flex;
+    .rank-row {
+      display: grid;
+      grid-template-columns: 48px 1fr 100px 80px 64px;
+      padding: 11px 20px;
       align-items: center;
-      padding: 10px 24px;
-      gap: 16px;
-      transition: background 0.15s;
+      border-bottom: 1px solid var(--border-light);
+      transition: background 0.1s;
       cursor: default;
-      position: relative;
     }
 
-    .keyword-item:hover {
-      background: var(--bg3);
-    }
+    .rank-row:last-child { border-bottom: none; }
+    .rank-row:hover { background: #FAFBFC; }
 
-    .keyword-item.top5::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 0;
-      bottom: 0;
-      width: 2px;
-    }
+    .rank-row.highlight { background: #FFFEF0; }
 
     .rank-num {
-      font-family: 'DM Mono', monospace;
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text-muted);
-      width: 24px;
-      flex-shrink: 0;
-      text-align: center;
-    }
-
-    .rank-num.top3 {
-      color: var(--green);
+      font-size: 14px;
       font-weight: 700;
+      color: var(--text-muted);
+      font-family: 'Roboto Mono', monospace;
     }
 
-    .keyword-info {
-      flex: 1;
+    .rank-num.gold { color: #F5A623; }
+    .rank-num.silver { color: #8B95A1; }
+    .rank-num.bronze { color: #CD7F32; }
+
+    .rank-keyword {
+      display: flex;
+      align-items: center;
+      gap: 8px;
       min-width: 0;
+    }
+
+    .color-bar {
+      width: 3px;
+      height: 28px;
+      border-radius: 2px;
+      flex-shrink: 0;
     }
 
     .keyword-name {
       font-size: 14px;
-      font-weight: 500;
+      font-weight: 600;
+      color: var(--text);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -336,182 +333,302 @@
     .keyword-comment {
       font-size: 11px;
       color: var(--text-muted);
-      margin-top: 2px;
+      margin-top: 1px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .keyword-right {
+    .rank-score {
+      text-align: right;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .rank-change {
+      text-align: right;
+      font-family: 'Roboto Mono', monospace;
+      font-size: 13px;
+      font-weight: 600;
+    }
+
+    .rank-bar-cell {
       display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 4px;
-      flex-shrink: 0;
+      justify-content: flex-end;
+      align-items: center;
     }
 
-    .change-badge {
-      font-family: 'DM Mono', monospace;
-      font-size: 11px;
-      font-weight: 500;
-      padding: 2px 7px;
-      border-radius: 4px;
-    }
-
-    .change-badge.up {
-      background: rgba(3,199,90,0.12);
-      color: var(--green);
-    }
-
-    .change-badge.down {
-      background: rgba(255,71,87,0.12);
-      color: var(--red);
-    }
-
-    .change-badge.flat {
-      background: rgba(255,255,255,0.05);
-      color: var(--text-muted);
-    }
-
-    .score-bar-wrap {
-      width: 60px;
-      height: 3px;
-      background: var(--bg3);
+    .rank-bar-outer {
+      width: 48px;
+      height: 4px;
+      background: var(--border-light);
       border-radius: 2px;
       overflow: hidden;
     }
 
-    .score-bar {
+    .rank-bar-inner {
       height: 100%;
       background: var(--green);
       border-radius: 2px;
-      transition: width 1s ease;
+      transition: width 1.2s ease;
     }
 
-    /* COLOR DOTS for top5 */
-    .color-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
+    /* HOT BADGE */
+    .hot-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--red);
+      background: var(--red-light);
+      padding: 2px 5px;
+      border-radius: 3px;
+      letter-spacing: 0.3px;
       flex-shrink: 0;
     }
 
-    /* LOADING */
-    .loading-state {
+    /* SIDEBAR */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* TOP5 SIDEBAR CARD */
+    .top5-list {
+      padding: 4px 0;
+    }
+
+    .top5-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 20px;
+      gap: 12px;
+      border-bottom: 1px solid var(--border-light);
+      transition: background 0.1s;
+    }
+
+    .top5-item:last-child { border-bottom: none; }
+    .top5-item:hover { background: #FAFBFC; }
+
+    .top5-rank {
+      font-size: 18px;
+      font-weight: 900;
+      color: var(--green);
+      width: 24px;
+      text-align: center;
+      font-family: 'Roboto Mono', monospace;
+      flex-shrink: 0;
+    }
+
+    .top5-info { flex: 1; min-width: 0; }
+
+    .top5-keyword {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .top5-meta {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .top5-change {
+      font-size: 13px;
+      font-weight: 700;
+      font-family: 'Roboto Mono', monospace;
+      flex-shrink: 0;
+    }
+
+    /* INFO CARD */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border-light);
+    }
+
+    .info-cell {
+      background: var(--white);
+      padding: 16px;
+    }
+
+    .info-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+
+    .info-val {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--text);
+      font-family: 'Roboto Mono', monospace;
+      letter-spacing: -0.5px;
+    }
+
+    .info-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    /* LOADING / ERROR */
+    .state-wrap {
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       padding: 80px;
-      gap: 16px;
+      gap: 12px;
       color: var(--text-muted);
     }
 
-    .loading-spinner {
-      width: 32px;
-      height: 32px;
+    .loading-ring {
+      width: 28px;
+      height: 28px;
       border: 2px solid var(--border);
       border-top-color: var(--green);
       border-radius: 50%;
-      animation: spin 0.8s linear infinite;
+      animation: spin 0.7s linear infinite;
     }
 
-    .loading-text {
-      font-size: 13px;
-      letter-spacing: 1px;
-    }
-
-    /* ERROR */
-    .error-state {
-      text-align: center;
-      padding: 60px;
-      color: var(--text-muted);
-      font-size: 14px;
-    }
+    .state-text { font-size: 13px; color: var(--text-muted); }
 
     /* FOOTER */
     footer {
-      border-top: 1px solid var(--border);
-      padding: 24px 32px;
-      margin-top: 60px;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px 24px 40px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
     }
 
-    .footer-text {
-      font-size: 11px;
-      color: var(--text-muted);
-    }
+    .footer-left { font-size: 12px; color: var(--text-muted); }
 
-    .footer-tags {
-      display: flex;
-      gap: 8px;
-    }
+    .footer-tags { display: flex; gap: 6px; }
 
     .footer-tag {
-      font-size: 10px;
+      font-size: 11px;
       color: var(--text-muted);
+      background: var(--white);
       border: 1px solid var(--border);
       padding: 3px 8px;
       border-radius: 4px;
-      letter-spacing: 0.5px;
     }
 
-    /* CHART COLORS */
-    .dot-0 { background: #03C75A; }
-    .dot-1 { background: #00b4d8; }
-    .dot-2 { background: #f8961e; }
-    .dot-3 { background: #f72585; }
-    .dot-4 { background: #7209b7; }
-
-    .border-0 { border-left-color: #03C75A; }
-    .border-1 { border-left-color: #00b4d8; }
-    .border-2 { border-left-color: #f8961e; }
-    .border-3 { border-left-color: #f72585; }
-    .border-4 { border-left-color: #7209b7; }
-
-    @media (max-width: 768px) {
-      header { padding: 0 16px; }
-      main { padding: 24px 16px; }
-      .ranking-section { grid-template-columns: 1fr; }
-      .header-right .update-time { display: none; }
+    @media (max-width: 900px) {
+      .main-wrap { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .rank-table-header,
+      .rank-row { grid-template-columns: 40px 1fr 80px 72px; }
+      .rank-table-header span:last-child,
+      .rank-bar-cell { display: none; }
     }
   </style>
 </head>
 <body>
 
 <header>
-  <div class="logo">
-    <div class="logo-icon">📡</div>
-    <div>
-      <div class="logo-text">블로그 트렌드 레이더</div>
-      <div class="logo-sub">BLOG TREND RADAR</div>
+  <div class="header-inner">
+    <div class="logo">
+      <div class="logo-mark">📡</div>
+      <span class="logo-name">블로그 트렌드 레이더</span>
+      <span class="logo-beta">BETA</span>
     </div>
-  </div>
-  <div class="header-right">
-    <div class="live-badge">
-      <div class="live-dot"></div>
-      LIVE
+    <div class="header-right">
+      <span class="update-info">
+        <span class="live-dot"></span>
+        <span id="updateTime">데이터 로딩 중</span>
+      </span>
+      <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
+        <span id="refreshIcon">↻</span> 새로고침
+      </button>
     </div>
-    <div class="update-time" id="updateTime">—</div>
-    <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
-      <span id="refreshIcon">↻</span> 새로고침
-    </button>
   </div>
 </header>
 
-<main>
-  <div id="appContent">
-    <div class="loading-state">
-      <div class="loading-spinner"></div>
-      <div class="loading-text">트렌드 데이터 불러오는 중...</div>
+<div class="ticker-bar">
+  <div class="ticker-inner" id="tickerBar">
+    <div class="ticker-item">
+      <span class="ticker-label">블로그 트렌드</span>
+      <span class="ticker-val" id="tick-top1">—</span>
+    </div>
+    <div class="ticker-item">
+      <span class="ticker-label">급상승</span>
+      <span class="ticker-val up" id="tick-rate">—</span>
+    </div>
+    <div class="ticker-item">
+      <span class="ticker-label">분석 키워드</span>
+      <span class="ticker-val" id="tick-count">—</span>
+    </div>
+    <div class="ticker-item">
+      <span class="ticker-label">업데이트</span>
+      <span class="ticker-val" id="tick-time">—</span>
     </div>
   </div>
-</main>
+</div>
+
+<div class="main-wrap">
+  <!-- LEFT: MAIN CONTENT -->
+  <div id="mainContent">
+    <div class="state-wrap">
+      <div class="loading-ring"></div>
+      <div class="state-text">트렌드 데이터 불러오는 중...</div>
+    </div>
+  </div>
+
+  <!-- RIGHT: SIDEBAR -->
+  <div class="sidebar" id="sidebar" style="display:none;">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">TOP 5</div>
+          <div class="card-sub">실시간 인기 키워드</div>
+        </div>
+      </div>
+      <div class="top5-list" id="top5List"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">현황</div>
+      </div>
+      <div class="info-grid">
+        <div class="info-cell">
+          <div class="info-label">분석 키워드</div>
+          <div class="info-val" id="stat-count">—</div>
+          <div class="info-sub">개</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">최고 상승률</div>
+          <div class="info-val up" id="stat-rate">—</div>
+          <div class="info-sub">%</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">1위 키워드</div>
+          <div class="info-val" id="stat-top" style="font-size:14px;">—</div>
+          <div class="info-sub">현재 1위</div>
+        </div>
+        <div class="info-cell">
+          <div class="info-label">데이터 갱신</div>
+          <div class="info-val" style="font-size:13px;" id="stat-time">—</div>
+          <div class="info-sub">마지막 업데이트</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 
 <footer>
-  <div class="footer-text">Powered by Naver Blog Search · DataLab · HyperCLOVA X</div>
+  <div class="footer-left">Powered by Naver Blog Search · DataLab · HyperCLOVA X</div>
   <div class="footer-tags">
     <span class="footer-tag">NAVER API</span>
     <span class="footer-tag">HyperCLOVA X</span>
@@ -520,22 +637,18 @@
 </footer>
 
 <script>
-const CHART_COLORS = ['#03C75A','#00b4d8','#f8961e','#f72585','#7209b7'];
+const CHART_COLORS = ['#03C75A','#1A73E8','#F5A623','#F04452','#9B59B6'];
 let chartInstance = null;
-let currentData = null;
 
 async function loadData() {
   try {
     const res = await fetch('/api/data');
-    if (!res.ok) throw new Error('데이터 없음');
+    if (!res.ok) throw new Error('no data');
     const data = await res.json();
-    currentData = data;
-    renderApp(data);
-  } catch (e) {
-    document.getElementById('appContent').innerHTML = `
-      <div class="error-state">
-        데이터를 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.
-      </div>`;
+    renderAll(data);
+  } catch(e) {
+    document.getElementById('mainContent').innerHTML = `
+      <div class="state-wrap"><div class="state-text">데이터를 불러오지 못했습니다.</div></div>`;
   }
 }
 
@@ -544,119 +657,145 @@ async function manualRefresh() {
   const icon = document.getElementById('refreshIcon');
   btn.classList.add('loading');
   icon.classList.add('spin');
-  icon.textContent = '↻';
-
   try {
-    const res = await fetch('/api/refresh');
-    await res.json();
+    await fetch('/api/refresh');
     await loadData();
   } catch(e) {
-    alert('새로고침 실패. 잠시 후 다시 시도해주세요.');
+    alert('새로고침 실패');
   } finally {
     btn.classList.remove('loading');
     icon.classList.remove('spin');
   }
 }
 
-function formatTime(iso) {
+function fmt(iso) {
   const d = new Date(iso);
-  return d.toLocaleString('ko-KR', {
-    month: 'numeric', day: 'numeric',
-    hour: '2-digit', minute: '2-digit'
-  }) + ' 업데이트';
+  return d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-function changeBadge(rate) {
-  if (rate > 5) return `<span class="change-badge up">▲ ${rate}%</span>`;
-  if (rate < -5) return `<span class="change-badge down">▼ ${Math.abs(rate)}%</span>`;
-  return `<span class="change-badge flat">— ${rate}%</span>`;
+function fmtShort(iso) {
+  const d = new Date(iso);
+  return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 }
 
-function renderApp(data) {
-  document.getElementById('updateTime').textContent = formatTime(data.updatedAt);
+function changeText(rate) {
+  if (rate > 5) return `<span class="up">▲${rate}%</span>`;
+  if (rate < -5) return `<span class="down">▼${Math.abs(rate)}%</span>`;
+  return `<span class="flat-color">-</span>`;
+}
 
-  const top5 = data.keywords.slice(0, 5);
-  const top10 = data.keywords.slice(0, 10);
-  const next10 = data.keywords.slice(10, 20);
-  const maxScore = data.keywords[0]?.score || 100;
+function renderAll(data) {
+  const kws = data.keywords;
+  const top5 = kws.slice(0, 5);
+  const maxScore = kws[0]?.score || 100;
+  const maxRate = Math.max(...kws.map(k => k.changeRate));
 
-  document.getElementById('appContent').innerHTML = `
-    <div class="chart-section">
-      <div class="chart-header">
-        <div class="chart-title">TOP 5 트렌드 키워드</div>
-        <div class="period-tabs">
-          <button class="period-tab active">1주</button>
-          <button class="period-tab">2주</button>
-          <button class="period-tab">4주</button>
-        </div>
+  // Header
+  document.getElementById('updateTime').textContent = fmt(data.updatedAt) + ' 업데이트';
+
+  // Ticker
+  document.getElementById('tick-top1').textContent = kws[0]?.keyword || '—';
+  document.getElementById('tick-rate').textContent = maxRate > 0 ? `+${maxRate}%` : '—';
+  document.getElementById('tick-count').textContent = kws.length + '개';
+  document.getElementById('tick-time').textContent = fmtShort(data.updatedAt);
+
+  // Sidebar stats
+  document.getElementById('stat-count').textContent = kws.length;
+  document.getElementById('stat-rate').textContent = maxRate;
+  document.getElementById('stat-top').textContent = kws[0]?.keyword || '—';
+  document.getElementById('stat-time').textContent = fmtShort(data.updatedAt);
+
+  // Top5 sidebar
+  document.getElementById('top5List').innerHTML = top5.map((kw, i) => `
+    <div class="top5-item">
+      <div class="top5-rank">${kw.rank}</div>
+      <div class="top5-info">
+        <div class="top5-keyword">${kw.keyword}</div>
+        <div class="top5-meta">${kw.comment || '트렌딩 키워드'}</div>
       </div>
-      <div class="chart-wrap">
-        <canvas id="trendChart"></canvas>
-      </div>
+      <div class="top5-change" style="color:${CHART_COLORS[i]}">${kw.changeRate > 0 ? '+' : ''}${kw.changeRate}%</div>
     </div>
+  `).join('');
 
-    <div class="section-header">
-      <span class="section-title">실시간 랭킹</span>
-      <div class="section-line"></div>
-    </div>
+  document.getElementById('sidebar').style.display = 'flex';
 
-    <div class="ranking-section">
-      <div class="ranking-card">
-        <div class="ranking-card-header">
-          <div class="ranking-card-title">TOP 10</div>
-          <div class="ranking-card-sub">1위 — 10위</div>
+  // Main content
+  document.getElementById('mainContent').innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:16px;">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">트렌드 차트</div>
+            <div class="card-sub">TOP 5 키워드 검색량 변화 추이</div>
+          </div>
+          <div class="period-tabs">
+            <button class="period-tab active">1주</button>
+            <button class="period-tab">2주</button>
+            <button class="period-tab">4주</button>
+          </div>
         </div>
-        <div class="keyword-list" id="list-top10"></div>
+        <div class="chart-wrap">
+          <canvas id="trendChart"></canvas>
+        </div>
       </div>
-      <div class="ranking-card">
-        <div class="ranking-card-header">
-          <div class="ranking-card-title">11 — 20위</div>
-          <div class="ranking-card-sub">더 많은 트렌드</div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">실시간 랭킹</div>
+            <div class="card-sub">네이버 블로그 트렌드 TOP 20</div>
+          </div>
         </div>
-        <div class="keyword-list" id="list-next10"></div>
+        <div class="rank-table-header">
+          <span>순위</span>
+          <span>키워드</span>
+          <span style="text-align:right">트렌드 점수</span>
+          <span style="text-align:right">검색 증감</span>
+          <span style="text-align:right">비중</span>
+        </div>
+        <div id="rankList"></div>
       </div>
     </div>
   `;
 
-  // Render lists
-  renderList('list-top10', top10, maxScore, true);
-  renderList('list-next10', next10, maxScore, false);
-
-  // Draw chart
-  drawChart(top5);
-}
-
-function renderList(containerId, keywords, maxScore, showDot) {
-  const container = document.getElementById(containerId);
-  container.innerHTML = keywords.map((kw, i) => {
-    const isTop3 = kw.rank <= 3;
+  // Render rank list
+  document.getElementById('rankList').innerHTML = kws.map((kw, i) => {
     const isTop5 = kw.rank <= 5;
-    const colorIdx = kw.rank - 1;
-    const scoreWidth = Math.round((kw.score / maxScore) * 100);
+    const colorIdx = Math.min(i, CHART_COLORS.length - 1);
+    const scoreW = Math.round((kw.score / maxScore) * 100);
+    const numClass = kw.rank === 1 ? 'gold' : kw.rank === 2 ? 'silver' : kw.rank === 3 ? 'bronze' : '';
+    const isHot = kw.changeRate >= 50;
 
     return `
-      <div class="keyword-item ${isTop5 ? 'top5 border-' + colorIdx : ''}">
-        <div class="rank-num ${isTop3 ? 'top3' : ''}">${kw.rank}</div>
-        ${showDot && isTop5 ? `<div class="color-dot dot-${colorIdx}"></div>` : (showDot ? '<div style="width:8px"></div>' : '')}
-        <div class="keyword-info">
-          <div class="keyword-name">${kw.keyword}</div>
-          ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
+      <div class="rank-row ${isHot ? 'highlight' : ''}">
+        <div class="rank-num ${numClass}">${kw.rank}</div>
+        <div class="rank-keyword">
+          ${isTop5 ? `<div class="color-bar" style="background:${CHART_COLORS[colorIdx]}"></div>` : '<div style="width:3px"></div>'}
+          <div style="min-width:0">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span class="keyword-name">${kw.keyword}</span>
+              ${isHot ? '<span class="hot-badge">🔥 HOT</span>' : ''}
+            </div>
+            ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
+          </div>
         </div>
-        <div class="keyword-right">
-          ${changeBadge(kw.changeRate)}
-          <div class="score-bar-wrap">
-            <div class="score-bar" style="width:${scoreWidth}%"></div>
+        <div class="rank-score">${kw.score}</div>
+        <div class="rank-change">${changeText(kw.changeRate)}</div>
+        <div class="rank-bar-cell">
+          <div class="rank-bar-outer">
+            <div class="rank-bar-inner" style="width:${scoreW}%"></div>
           </div>
         </div>
       </div>
     `;
   }).join('');
+
+  drawChart(top5);
 }
 
 function drawChart(top5) {
   if (chartInstance) chartInstance.destroy();
   const ctx = document.getElementById('trendChart').getContext('2d');
-
   const labels = Array.from({length: 7}, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (6 - i));
@@ -664,22 +803,20 @@ function drawChart(top5) {
   });
 
   const datasets = top5.map((kw, i) => {
-    // Generate trend-like data from changeRate
-    const base = 30 + Math.random() * 30;
+    const base = 30 + Math.random() * 20;
     const points = Array.from({length: 7}, (_, j) => {
-      const trend = (kw.changeRate / 100) * (j / 6) * 40;
-      return Math.max(5, base + trend + (Math.random() - 0.5) * 10);
+      const trend = (kw.changeRate / 100) * (j / 6) * 35;
+      return Math.max(5, base + trend + (Math.random() - 0.5) * 8);
     });
     return {
       label: kw.keyword,
       data: points,
       borderColor: CHART_COLORS[i],
-      backgroundColor: CHART_COLORS[i] + '15',
+      backgroundColor: 'transparent',
       borderWidth: 2,
       pointRadius: 3,
       pointHoverRadius: 5,
       tension: 0.4,
-      fill: false,
     };
   });
 
@@ -694,39 +831,40 @@ function drawChart(top5) {
         legend: {
           position: 'bottom',
           labels: {
-            color: '#888',
+            color: '#8B95A1',
             font: { size: 11, family: 'Noto Sans KR' },
             boxWidth: 10,
-            padding: 16,
+            padding: 14,
           }
         },
         tooltip: {
-          backgroundColor: '#1a1a1a',
-          borderColor: '#333',
+          backgroundColor: '#fff',
+          borderColor: '#E5E8ED',
           borderWidth: 1,
-          titleColor: '#ccc',
-          bodyColor: '#888',
-          titleFont: { family: 'Noto Sans KR', size: 12 },
-          bodyFont: { family: 'DM Mono', size: 11 },
+          titleColor: '#191F28',
+          bodyColor: '#4E5968',
+          titleFont: { family: 'Noto Sans KR', size: 12, weight: '700' },
+          bodyFont: { family: 'Roboto Mono', size: 11 },
+          padding: 10,
+          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
         }
       },
       scales: {
         x: {
-          grid: { color: 'rgba(255,255,255,0.04)' },
-          ticks: { color: '#555', font: { size: 11, family: 'DM Mono' } },
-          border: { color: 'transparent' },
+          grid: { color: '#F0F2F5' },
+          ticks: { color: '#B0B8C1', font: { size: 11, family: 'Roboto Mono' } },
+          border: { color: '#E5E8ED' },
         },
         y: {
-          grid: { color: 'rgba(255,255,255,0.04)' },
-          ticks: { color: '#555', font: { size: 11, family: 'DM Mono' } },
-          border: { color: 'transparent' },
+          grid: { color: '#F0F2F5' },
+          ticks: { color: '#B0B8C1', font: { size: 11, family: 'Roboto Mono' } },
+          border: { color: '#E5E8ED' },
         }
       }
     }
   });
 }
 
-// Init
 loadData();
 </script>
 </body>
