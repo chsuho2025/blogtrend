@@ -390,6 +390,32 @@
       flex-shrink: 0;
     }
 
+    /* TREND BADGES */
+    .trend-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 3px;
+      letter-spacing: 0.3px;
+      flex-shrink: 0;
+    }
+    .trend-badge.yebo {
+      color: #7C3AED;
+      background: #F3EEFF;
+    }
+    .trend-badge.yujung {
+      color: #03C75A;
+      background: #E8F9F0;
+    }
+    .trend-badge.yuji {
+      color: #8B95A1;
+      background: #F0F2F5;
+    }
+    .rank-row.yebo-row { background: #FDFBFF; }
+
     /* SIDEBAR */
     .sidebar {
       display: flex;
@@ -765,16 +791,22 @@ function renderAll(data) {
     const scoreW = Math.round((kw.score / maxScore) * 100);
     const numClass = kw.rank === 1 ? 'gold' : kw.rank === 2 ? 'silver' : kw.rank === 3 ? 'bronze' : '';
     const isHot = kw.changeRate >= 50;
+    const trendBadge = kw.trend === '유행예감'
+      ? '<span class="trend-badge yebo">🔮 유행예감</span>'
+      : kw.trend === '유행중'
+      ? '<span class="trend-badge yujung">🔥 유행중</span>'
+      : '<span class="trend-badge yuji">📉 유행지남</span>';
+    const rowClass = kw.trend === '유행예감' ? 'yebo-row' : isHot ? 'highlight' : '';
 
     return `
-      <div class="rank-row ${isHot ? 'highlight' : ''}">
+      <div class="rank-row ${rowClass}">
         <div class="rank-num ${numClass}">${kw.rank}</div>
         <div class="rank-keyword">
           ${isTop5 ? `<div class="color-bar" style="background:${CHART_COLORS[colorIdx]}"></div>` : '<div style="width:3px"></div>'}
           <div style="min-width:0">
             <div style="display:flex;align-items:center;gap:6px">
               <span class="keyword-name">${kw.keyword}</span>
-              ${isHot ? '<span class="hot-badge">🔥 HOT</span>' : ''}
+              ${trendBadge}
             </div>
             ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
           </div>
