@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>블로그 트렌드 레이더</title>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --green: #03C75A;
+      --green-dim: #02a34c;
+      --green-glow: rgba(3, 199, 90, 0.15);
+      --green-subtle: rgba(3, 199, 90, 0.06);
+      --bg: #0a0a0a;
+      --bg2: #111111;
+      --bg3: #181818;
+      --border: rgba(255,255,255,0.07);
+      --text: #f0f0f0;
+      --text-muted: #666;
+      --text-dim: #999;
+      --red: #ff4757;
+      --yellow: #ffa502;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Noto Sans KR', sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* HEADER */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(10,10,10,0.92);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: var(--green);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+    }
+
+    .logo-text {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 300;
+      letter-spacing: 0.5px;
+      margin-top: 1px;
+    }
+
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--green-subtle);
+      border: 1px solid rgba(3,199,90,0.2);
+      border-radius: 20px;
+      padding: 5px 12px;
+      font-size: 11px;
+      font-weight: 500;
+      color: var(--green);
+      letter-spacing: 0.5px;
+    }
+
+    .live-dot {
+      width: 6px;
+      height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    .update-time {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .refresh-btn {
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 7px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: 'Noto Sans KR', sans-serif;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .refresh-btn:hover {
+      border-color: var(--green);
+      color: var(--green);
+      background: var(--green-subtle);
+    }
+
+    .refresh-btn.loading {
+      opacity: 0.5;
+      pointer-events: none;
+    }
+
+    .refresh-btn .spin {
+      display: inline-block;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+
+    /* MAIN LAYOUT */
+    main {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 32px;
+    }
+
+    /* SECTION TITLE */
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 24px;
+    }
+
+    .section-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .section-line {
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    /* TOP 5 CHART */
+    .chart-section {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .chart-section::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--green), transparent);
+    }
+
+    .chart-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+
+    .chart-title {
+      font-size: 16px;
+      font-weight: 700;
+    }
+
+    .period-tabs {
+      display: flex;
+      gap: 4px;
+      background: var(--bg3);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .period-tab {
+      padding: 5px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.2s;
+      border: none;
+      background: none;
+      font-family: 'Noto Sans KR', sans-serif;
+    }
+
+    .period-tab.active {
+      background: var(--green);
+      color: #000;
+      font-weight: 700;
+    }
+
+    .chart-wrap {
+      height: 220px;
+      position: relative;
+    }
+
+    /* RANKING */
+    .ranking-section {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+    }
+
+    .ranking-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .ranking-card-header {
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .ranking-card-title {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .ranking-card-sub {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .keyword-list {
+      padding: 8px 0;
+    }
+
+    .keyword-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 24px;
+      gap: 16px;
+      transition: background 0.15s;
+      cursor: default;
+      position: relative;
+    }
+
+    .keyword-item:hover {
+      background: var(--bg3);
+    }
+
+    .keyword-item.top5::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+    }
+
+    .rank-num {
+      font-family: 'DM Mono', monospace;
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-muted);
+      width: 24px;
+      flex-shrink: 0;
+      text-align: center;
+    }
+
+    .rank-num.top3 {
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    .keyword-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .keyword-name {
+      font-size: 14px;
+      font-weight: 500;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .keyword-comment {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .keyword-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      flex-shrink: 0;
+    }
+
+    .change-badge {
+      font-family: 'DM Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .change-badge.up {
+      background: rgba(3,199,90,0.12);
+      color: var(--green);
+    }
+
+    .change-badge.down {
+      background: rgba(255,71,87,0.12);
+      color: var(--red);
+    }
+
+    .change-badge.flat {
+      background: rgba(255,255,255,0.05);
+      color: var(--text-muted);
+    }
+
+    .score-bar-wrap {
+      width: 60px;
+      height: 3px;
+      background: var(--bg3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .score-bar {
+      height: 100%;
+      background: var(--green);
+      border-radius: 2px;
+      transition: width 1s ease;
+    }
+
+    /* COLOR DOTS for top5 */
+    .color-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* LOADING */
+    .loading-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 80px;
+      gap: 16px;
+      color: var(--text-muted);
+    }
+
+    .loading-spinner {
+      width: 32px;
+      height: 32px;
+      border: 2px solid var(--border);
+      border-top-color: var(--green);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .loading-text {
+      font-size: 13px;
+      letter-spacing: 1px;
+    }
+
+    /* ERROR */
+    .error-state {
+      text-align: center;
+      padding: 60px;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    /* FOOTER */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 24px 32px;
+      margin-top: 60px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .footer-text {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .footer-tags {
+      display: flex;
+      gap: 8px;
+    }
+
+    .footer-tag {
+      font-size: 10px;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    /* CHART COLORS */
+    .dot-0 { background: #03C75A; }
+    .dot-1 { background: #00b4d8; }
+    .dot-2 { background: #f8961e; }
+    .dot-3 { background: #f72585; }
+    .dot-4 { background: #7209b7; }
+
+    .border-0 { border-left-color: #03C75A; }
+    .border-1 { border-left-color: #00b4d8; }
+    .border-2 { border-left-color: #f8961e; }
+    .border-3 { border-left-color: #f72585; }
+    .border-4 { border-left-color: #7209b7; }
+
+    @media (max-width: 768px) {
+      header { padding: 0 16px; }
+      main { padding: 24px 16px; }
+      .ranking-section { grid-template-columns: 1fr; }
+      .header-right .update-time { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-icon">📡</div>
+    <div>
+      <div class="logo-text">블로그 트렌드 레이더</div>
+      <div class="logo-sub">BLOG TREND RADAR</div>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="live-badge">
+      <div class="live-dot"></div>
+      LIVE
+    </div>
+    <div class="update-time" id="updateTime">—</div>
+    <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
+      <span id="refreshIcon">↻</span> 새로고침
+    </button>
+  </div>
+</header>
+
+<main>
+  <div id="appContent">
+    <div class="loading-state">
+      <div class="loading-spinner"></div>
+      <div class="loading-text">트렌드 데이터 불러오는 중...</div>
+    </div>
+  </div>
+</main>
+
+<footer>
+  <div class="footer-text">Powered by Naver Blog Search · DataLab · HyperCLOVA X</div>
+  <div class="footer-tags">
+    <span class="footer-tag">NAVER API</span>
+    <span class="footer-tag">HyperCLOVA X</span>
+    <span class="footer-tag">Vercel</span>
+  </div>
+</footer>
+
+<script>
+const CHART_COLORS = ['#03C75A','#00b4d8','#f8961e','#f72585','#7209b7'];
+let chartInstance = null;
+let currentData = null;
+
+async function loadData() {
+  try {
+    const res = await fetch('/api/data');
+    if (!res.ok) throw new Error('데이터 없음');
+    const data = await res.json();
+    currentData = data;
+    renderApp(data);
+  } catch (e) {
+    document.getElementById('appContent').innerHTML = `
+      <div class="error-state">
+        데이터를 불러오지 못했습니다.<br>잠시 후 다시 시도해주세요.
+      </div>`;
+  }
+}
+
+async function manualRefresh() {
+  const btn = document.getElementById('refreshBtn');
+  const icon = document.getElementById('refreshIcon');
+  btn.classList.add('loading');
+  icon.classList.add('spin');
+  icon.textContent = '↻';
+
+  try {
+    const res = await fetch('/api/refresh');
+    await res.json();
+    await loadData();
+  } catch(e) {
+    alert('새로고침 실패. 잠시 후 다시 시도해주세요.');
+  } finally {
+    btn.classList.remove('loading');
+    icon.classList.remove('spin');
+  }
+}
+
+function formatTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('ko-KR', {
+    month: 'numeric', day: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  }) + ' 업데이트';
+}
+
+function changeBadge(rate) {
+  if (rate > 5) return `<span class="change-badge up">▲ ${rate}%</span>`;
+  if (rate < -5) return `<span class="change-badge down">▼ ${Math.abs(rate)}%</span>`;
+  return `<span class="change-badge flat">— ${rate}%</span>`;
+}
+
+function renderApp(data) {
+  document.getElementById('updateTime').textContent = formatTime(data.updatedAt);
+
+  const top5 = data.keywords.slice(0, 5);
+  const top10 = data.keywords.slice(0, 10);
+  const next10 = data.keywords.slice(10, 20);
+  const maxScore = data.keywords[0]?.score || 100;
+
+  document.getElementById('appContent').innerHTML = `
+    <div class="chart-section">
+      <div class="chart-header">
+        <div class="chart-title">TOP 5 트렌드 키워드</div>
+        <div class="period-tabs">
+          <button class="period-tab active">1주</button>
+          <button class="period-tab">2주</button>
+          <button class="period-tab">4주</button>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <span class="section-title">실시간 랭킹</span>
+      <div class="section-line"></div>
+    </div>
+
+    <div class="ranking-section">
+      <div class="ranking-card">
+        <div class="ranking-card-header">
+          <div class="ranking-card-title">TOP 10</div>
+          <div class="ranking-card-sub">1위 — 10위</div>
+        </div>
+        <div class="keyword-list" id="list-top10"></div>
+      </div>
+      <div class="ranking-card">
+        <div class="ranking-card-header">
+          <div class="ranking-card-title">11 — 20위</div>
+          <div class="ranking-card-sub">더 많은 트렌드</div>
+        </div>
+        <div class="keyword-list" id="list-next10"></div>
+      </div>
+    </div>
+  `;
+
+  // Render lists
+  renderList('list-top10', top10, maxScore, true);
+  renderList('list-next10', next10, maxScore, false);
+
+  // Draw chart
+  drawChart(top5);
+}
+
+function renderList(containerId, keywords, maxScore, showDot) {
+  const container = document.getElementById(containerId);
+  container.innerHTML = keywords.map((kw, i) => {
+    const isTop3 = kw.rank <= 3;
+    const isTop5 = kw.rank <= 5;
+    const colorIdx = kw.rank - 1;
+    const scoreWidth = Math.round((kw.score / maxScore) * 100);
+
+    return `
+      <div class="keyword-item ${isTop5 ? 'top5 border-' + colorIdx : ''}">
+        <div class="rank-num ${isTop3 ? 'top3' : ''}">${kw.rank}</div>
+        ${showDot && isTop5 ? `<div class="color-dot dot-${colorIdx}"></div>` : (showDot ? '<div style="width:8px"></div>' : '')}
+        <div class="keyword-info">
+          <div class="keyword-name">${kw.keyword}</div>
+          ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
+        </div>
+        <div class="keyword-right">
+          ${changeBadge(kw.changeRate)}
+          <div class="score-bar-wrap">
+            <div class="score-bar" style="width:${scoreWidth}%"></div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function drawChart(top5) {
+  if (chartInstance) chartInstance.destroy();
+  const ctx = document.getElementById('trendChart').getContext('2d');
+
+  const labels = Array.from({length: 7}, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  });
+
+  const datasets = top5.map((kw, i) => {
+    // Generate trend-like data from changeRate
+    const base = 30 + Math.random() * 30;
+    const points = Array.from({length: 7}, (_, j) => {
+      const trend = (kw.changeRate / 100) * (j / 6) * 40;
+      return Math.max(5, base + trend + (Math.random() - 0.5) * 10);
+    });
+    return {
+      label: kw.keyword,
+      data: points,
+      borderColor: CHART_COLORS[i],
+      backgroundColor: CHART_COLORS[i] + '15',
+      borderWidth: 2,
+      pointRadius: 3,
+      pointHoverRadius: 5,
+      tension: 0.4,
+      fill: false,
+    };
+  });
+
+  chartInstance = new Chart(ctx, {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            color: '#888',
+            font: { size: 11, family: 'Noto Sans KR' },
+            boxWidth: 10,
+            padding: 16,
+          }
+        },
+        tooltip: {
+          backgroundColor: '#1a1a1a',
+          borderColor: '#333',
+          borderWidth: 1,
+          titleColor: '#ccc',
+          bodyColor: '#888',
+          titleFont: { family: 'Noto Sans KR', size: 12 },
+          bodyFont: { family: 'DM Mono', size: 11 },
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#555', font: { size: 11, family: 'DM Mono' } },
+          border: { color: 'transparent' },
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: { color: '#555', font: { size: 11, family: 'DM Mono' } },
+          border: { color: 'transparent' },
+        }
+      }
+    }
+  });
+}
+
+// Init
+loadData();
+</script>
+</body>
+</html>
