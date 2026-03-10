@@ -56,7 +56,7 @@ async function extractKeywords(titles) {
         messages: [
           {
             role: 'system',
-            content: '아래는 카테고리별 네이버 블로그 제목 목록이야. 각 카테고리에서 최소 3~4개씩 균등하게 핵심 키워드를 추출해서 총 40개를 JSON 배열로만 반환해. 카테고리 이름은 포함하지 말고 키워드만. 다른 설명 없이 ["키워드1","키워드2",...] 형식으로만.',
+            content: '아래는 카테고리별 네이버 블로그 제목 목록이야. 각 카테고리에서 최소 3~4개씩 균등하게 핵심 키워드를 추출해서 총 40개를 JSON 배열로만 반환해. 반드시 문자열 배열 형식으로만: ["키워드1","키워드2","키워드3",...]. 객체 형식 사용 금지. 다른 설명이나 마크다운 없이 JSON 배열만.',
           },
           { role: 'user', content: categoryText },
         ],
@@ -70,7 +70,13 @@ async function extractKeywords(titles) {
   const text = data.result?.message?.content || '[]';
   console.log('[CLOVA 1차] raw:', text.slice(0, 200));
   try {
-    return JSON.parse(text.replace(/```json|```/g, '').trim());
+    const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
+    // CLOVA가 [{키워드: "..."}] 형태로 반환할 경우 문자열 배열로 변환
+    return parsed.map(item => {
+      if (typeof item === 'string') return item;
+      if (typeof item === 'object') return item['키워드'] || item['keyword'] || Object.values(item)[0] || '';
+      return '';
+    }).filter(Boolean);
   } catch {
     return [];
   }
