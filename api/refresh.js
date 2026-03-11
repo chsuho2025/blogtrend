@@ -207,17 +207,20 @@ async function getSearchTrends(keywords, mode = 'weekly') {
       if (data.results) {
         for (const result of data.results) {
           const values = result.data.map(d => d.ratio);
-          let changeRate;
-          if (mode === 'rising') {
-            const recent3 = values.slice(-3);
-            const prev3 = values.slice(-6, -3);
-            changeRate = avg(prev3) > 0 ? ((avg(recent3) - avg(prev3)) / avg(prev3)) * 100 : 0;
+          const recent7 = values.slice(-7);
+          const prev7 = values.slice(-14, -7);
+          const weeklyRate = avg(prev7) > 0 ? ((avg(recent7) - avg(prev7)) / avg(prev7)) * 100 : 0;
+          const recent3 = values.slice(-3);
+          const prev3 = values.slice(-6, -3);
+          const risingRate = avg(prev3) > 0 ? ((avg(recent3) - avg(prev3)) / avg(prev3)) * 100 : 0;
+
+          if (mode === 'both') {
+            results.push({ keyword: result.title, weeklyRate, risingRate, values });
+          } else if (mode === 'rising') {
+            results.push({ keyword: result.title, changeRate: risingRate, values });
           } else {
-            const recent7 = values.slice(-7);
-            const prev7 = values.slice(-14, -7);
-            changeRate = avg(prev7) > 0 ? ((avg(recent7) - avg(prev7)) / avg(prev7)) * 100 : 0;
+            results.push({ keyword: result.title, changeRate: weeklyRate, values });
           }
-          results.push({ keyword: result.title, changeRate, values });
         }
       }
     } catch (e) {
@@ -352,11 +355,11 @@ module.exports = async (req, res) => {
     const keywordPool = await updateKeywordPool(extracted);
     if (!keywordPool.length) throw new Error('키워드 풀 없음');
 
-    // 4. DataLab 검색량 조회 (7일 + 3일 동시)
-    const [weeklyTrends, risingTrends] = await Promise.all([
-      getSearchTrends(keywordPool, 'weekly'),
-      getSearchTrends(keywordPool, 'rising'),
-    ]);
+    // 4. DataLab 검색량 조회 (최신 40개만, 한 번 호출)
+    const queryKeywords = keywordPool.slice(0, 40);
+    const rawTrends = await getSearchTrends(queryKeywords, 'both');
+    const weeklyTrends = rawTrends.map(t => ({ keyword: t.keyword, changeRate: t.weeklyRate, values: t.values }));
+    const risingTrends = rawTrends.map(t => ({ keyword: t.keyword, changeRate: t.risingRate, values: t.values }));
     if (!weeklyTrends.length) throw new Error('트렌드 조회 실패');
 
     // 5. 포스팅 수 조회 (상위 20개)
