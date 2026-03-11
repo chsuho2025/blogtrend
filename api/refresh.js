@@ -7,67 +7,88 @@ const redis = new Redis({
 
 // ─────────────────────────────────────────
 // 씨드 키워드 (카테고리별)
-// 네이버 블로그에서 실제로 검색되는 라이프스타일 표현
+// 네이버 투데이 탭 6개 카테고리 기준
 // ─────────────────────────────────────────
-const SEED_KEYWORDS = [
-  // 음식/디저트
-  '신상 디저트', '카페 신메뉴', '편의점 신상', '홈베이킹 레시피',
-  '브런치 메뉴', '요즘 빵집', '디저트 맛집', '신상 음료',
+const SEED_CATEGORIES = {
+  패션뷰티: [
+    '올리브영 신상', '다이소 뷰티', '요즘 립', '신상 향수',
+    '무신사 추천', '코디 추천', '봄 신상', '뷰티 템',
+  ],
+  여행맛집: [
+    '신상 디저트', '카페 신메뉴', '편의점 신상', '요즘 빵집',
+    '디저트 맛집', '신상 음료', '주말 나들이', '서울 핫플', '카페 투어',
+  ],
+  리빙푸드: [
+    '홈베이킹 레시피', '자취 꿀템', '다이소 신상', '인테리어 소품',
+    '홈카페 꾸미기', '살림 꿀팁', '청소 꿀팁', '주방 꿀템',
+  ],
+  카테크: [
+    '요즘 가전', '신상 전자기기', '다이소 신상템', '스마트 가전',
+  ],
+  지식: [
+    '홈트 루틴', '다이어트 식단', '필라테스 후기', '건강 간식',
+    '자기계발 책', '생활 꿀팁',
+  ],
+  경제: [
+    '재테크 방법', '절약 꿀팁', '무지출 챌린지', '짠테크',
+  ],
+};
 
-  // 패션/뷰티
-  '올리브영 신상', '다이소 뷰티', '요즘 립', '신상 향수',
-  '무신사 추천', '코디 추천', '봄 신상', '뷰티 템',
-
-  // 라이프스타일
-  '자취 꿀템', '다이소 신상', '인테리어 소품', '홈카페 꾸미기',
-  '살림 꿀팁', '청소 꿀팁', '주방 꿀템', '생활 꿀팁',
-
-  // 건강/운동
-  '홈트 루틴', '다이어트 식단', '필라테스 후기', '건강 간식',
-
-  // 여행/나들이
-  '주말 나들이', '국내 여행 추천', '서울 핫플', '카페 투어',
-];
+// 카테고리별 블로거 역할 설명
+const BLOGGER_ROLES = {
+  패션뷰티: '너는 패션·뷰티 전문 블로거야. 최신 뷰티 아이템, 코디 트렌드, 신상 제품에 민감해.',
+  여행맛집: '너는 맛집·카페·여행 전문 블로거야. 요즘 뜨는 디저트, 신상 음료, 핫플레이스에 민감해.',
+  리빙푸드: '너는 라이프스타일·인테리어·요리 전문 블로거야. 자취 꿀템, 홈카페, 살림 트렌드에 민감해.',
+  카테크: '너는 IT·가전·테크 전문 블로거야. 신상 전자기기, 가성비 템, 앱 트렌드에 민감해.',
+  지식: '너는 건강·자기계발 전문 블로거야. 요즘 운동 루틴, 다이어트 트렌드, 생활 꿀팁에 민감해.',
+  경제: '너는 재테크·절약 전문 블로거야. 무지출 챌린지, 짠테크, 절약 트렌드에 민감해.',
+};
 
 // ─────────────────────────────────────────
-// 1단계: 씨드 키워드로 블로그 최신 제목 수집
+// 1단계: 카테고리별 블로그 최신 제목 수집
 // ─────────────────────────────────────────
-async function collectBlogTitles() {
-  const titles = [];
+async function collectBlogTitlesByCategory() {
+  const categoryTitles = {}; // { 패션뷰티: [...], 여행맛집: [...], ... }
+  let totalCount = 0;
 
-  for (const seed of SEED_KEYWORDS) {
-    try {
-      const url = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(seed)}&display=50&sort=date`;
-      const res = await fetch(url, {
-        headers: {
-          'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
-          'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
-        },
-      });
-      const data = await res.json();
-      if (data.items) {
-        for (const item of data.items) {
-          // HTML 태그 제거
-          const clean = item.title.replace(/<[^>]+>/g, '').trim();
-          if (clean.length >= 2) titles.push(clean);
+  for (const [category, seeds] of Object.entries(SEED_CATEGORIES)) {
+    categoryTitles[category] = [];
+    for (const seed of seeds) {
+      try {
+        const url = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(seed)}&display=50&sort=date`;
+        const res = await fetch(url, {
+          headers: {
+            'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
+            'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
+          },
+        });
+        const data = await res.json();
+        if (data.items) {
+          for (const item of data.items) {
+            const clean = item.title.replace(/<[^>]+>/g, '').trim();
+            if (clean.length >= 2) categoryTitles[category].push(clean);
+          }
         }
+      } catch (e) {
+        console.log(`[collectBlogTitles] 실패: ${seed}`, e.message);
       }
-    } catch (e) {
-      console.log(`[collectBlogTitles] 실패: ${seed}`, e.message);
     }
+    console.log(`[collectBlogTitles] ${category}: ${categoryTitles[category].length}개`);
+    totalCount += categoryTitles[category].length;
   }
 
-  console.log(`[collectBlogTitles] 총 ${titles.length}개 제목 수집`);
-  return titles;
+  console.log(`[collectBlogTitles] 총 ${totalCount}개 제목 수집`);
+  return categoryTitles;
 }
 
 // ─────────────────────────────────────────
-// 2단계: HyperCLOVA X로 제목에서 트렌드 명사 추출
+// 2단계: 카테고리별 블로거 역할로 키워드 추출
 // ─────────────────────────────────────────
-async function extractTrendKeywords(titles) {
-  // 500개 샘플링 (토큰 절약)
-  const sample = titles.sort(() => 0.5 - Math.random()).slice(0, 500);
+async function extractKeywordsFromCategory(category, titles) {
+  // 카테고리별 최대 200개 샘플링
+  const sample = titles.sort(() => 0.5 - Math.random()).slice(0, 200);
   const titleText = sample.join('\n');
+  const role = BLOGGER_ROLES[category];
 
   try {
     const res = await fetch(
@@ -82,19 +103,20 @@ async function extractTrendKeywords(titles) {
           messages: [
             {
               role: 'system',
-              content: `아래는 최근 네이버 블로그 제목 목록이야.
-이 제목들에서 반복적으로 등장하거나 눈에 띄는 구체적인 트렌드 키워드를 30~50개 추출해줘.
+              content: `${role}
+아래는 최근 네이버 블로그 제목 목록이야.
+네가 다음 포스팅 주제를 고른다면 어떤 키워드를 선택할 것 같아?
+제목들에서 지금 당장 포스팅하고 싶은 구체적인 키워드 5~8개만 골라줘.
 
-추출 기준:
-- 구체적인 음식명/아이템명 (예: 두바이초콜릿, 크림치즈볼, 흑임자라떼)
-- SNS/커뮤니티에서 유행하는 표현 (예: 무지출챌린지, 갓생, 미니멀라이프)
-- 특정 제품/브랜드 트렌드 (예: 다이소신상, 올리브영핫템)
-- 라이프스타일 트렌드 (예: 홈카페, 자취템)
+선택 기준:
+- 구체적인 아이템명/음식명 (예: 상하이버터떡, 흑임자라떼, 크림치즈볼)
+- 요즘 SNS에서 유행하는 표현 (예: 무지출챌린지, 갓생루틴)
+- 방금 막 뜨기 시작한 느낌의 신조어나 신상
 
-제외 기준:
-- 뉴스/사건/인명/정치 관련 단어
-- "추천", "후기", "리뷰" 같은 일반 단어
-- 너무 광범위한 단어 (예: 맛집, 카페, 여행)
+제외:
+- 뉴스/사건/인명
+- 너무 광범위한 단어 (맛집, 카페, 여행, 뷰티 등)
+- 씨드 키워드 그대로 (예: "올리브영 신상" 같은 검색어 자체)
 
 반드시 JSON 배열로만 반환: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
@@ -104,8 +126,8 @@ async function extractTrendKeywords(titles) {
               content: titleText,
             },
           ],
-          maxTokens: 600,
-          temperature: 0.3,
+          maxTokens: 200,
+          temperature: 0.4,
           repetitionPenalty: 1.1,
         }),
       }
@@ -114,12 +136,25 @@ async function extractTrendKeywords(titles) {
     const text = data.result?.message?.content || '[]';
     const cleaned = text.replace(/```json|```/g, '').trim();
     const keywords = JSON.parse(cleaned);
-    console.log(`[extractTrendKeywords] ${keywords.length}개 추출:`, keywords.slice(0, 10));
+    console.log(`[extractKeywords] ${category}: ${keywords.length}개 →`, keywords);
     return keywords;
   } catch (e) {
-    console.log('[extractTrendKeywords] 실패:', e.message);
+    console.log(`[extractKeywords] ${category} 실패:`, e.message);
     return [];
   }
+}
+
+async function extractTrendKeywords(categoryTitles) {
+  const allKeywords = [];
+  for (const [category, titles] of Object.entries(categoryTitles)) {
+    if (!titles.length) continue;
+    const keywords = await extractKeywordsFromCategory(category, titles);
+    allKeywords.push(...keywords);
+  }
+  // 중복 제거
+  const unique = [...new Set(allKeywords)];
+  console.log(`[extractTrendKeywords] 전체 ${unique.length}개 추출`);
+  return unique;
 }
 
 // ─────────────────────────────────────────
@@ -302,12 +337,13 @@ function normalize(values) {
 // ─────────────────────────────────────────
 module.exports = async (req, res) => {
   try {
-    // 1. 씨드 키워드로 블로그 최신 제목 수집
-    const titles = await collectBlogTitles();
-    if (!titles.length) throw new Error('블로그 제목 수집 실패');
+    // 1. 카테고리별 블로그 최신 제목 수집
+    const categoryTitles = await collectBlogTitlesByCategory();
+    const totalTitles = Object.values(categoryTitles).flat().length;
+    if (!totalTitles) throw new Error('블로그 제목 수집 실패');
 
-    // 2. HyperCLOVA X로 트렌드 키워드 추출
-    const extracted = await extractTrendKeywords(titles);
+    // 2. 카테고리별 블로거 역할로 키워드 추출
+    const extracted = await extractTrendKeywords(categoryTitles);
 
     // 3. 키워드 풀 누적 업데이트
     const keywordPool = await updateKeywordPool(extracted);
@@ -389,7 +425,7 @@ module.exports = async (req, res) => {
       success: true,
       updatedAt: result.updatedAt,
       poolSize: keywordPool.length,
-      titlesCollected: titles.length,
+      titlesCollected: totalTitles,
       keywordsExtracted: extracted.length,
     });
   } catch (err) {
