@@ -164,9 +164,12 @@ async function updateKeywordPool(newKeywords) {
   let pool = [];
   try {
     const stored = await redis.get('keyword_pool');
-    if (stored) pool = JSON.parse(stored);
-  } catch {
-    console.log('[updateKeywordPool] pool 없음, 새로 시작');
+    if (stored && stored !== null) {
+      pool = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    }
+    console.log('[updateKeywordPool] 기존 pool 크기:', pool.length);
+  } catch (e) {
+    console.log('[updateKeywordPool] pool 로드 실패, 새로 시작:', e.message);
   }
 
   const merged = [...new Set([...newKeywords, ...pool])];
