@@ -383,32 +383,44 @@ module.exports = async (req, res) => {
       const score = normalizedRates[i] * 0.5 + (t.changeRate > 0 ? 0.3 : 0) + normalizedPost * 0.2;
       const trend = classifyTrend(t.changeRate, postCount, medianPost);
       return { keyword: t.keyword, score, changeRate: t.changeRate, postCount, trend };
-    }).sort((a, b) => b.score - a.score).slice(0, 20);
+    }).sort((a, b) => b.score - a.score);
+
+    // 중복 키워드 제거 (같은 베이스 키워드면 점수 높은 것만 유지)
+    const deduped = [];
+    for (const item of ranked) {
+      const base = item.keyword.replace(/(레시피|추천|후기|방법|종류|효능|비교|순위|가격|사용법|\s+\S+$)/, '').trim();
+      const isDup = deduped.some(d => {
+        const dBase = d.keyword.replace(/(레시피|추천|후기|방법|종류|효능|비교|순위|가격|사용법|\s+\S+$)/, '').trim();
+        return d.keyword.startsWith(base) || item.keyword.startsWith(dBase) || base === dBase;
+      });
+      if (!isDup) deduped.push(item);
+    }
+    const finalRanked = deduped.slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
 
     // 7. 급상승 랭킹
     const risingRateMap = Object.fromEntries(risingTrends.map(t => [t.keyword, t.changeRate]));
-    const risingRanked = [...ranked]
+    const risingRanked = [...finalRanked]
       .map(k => ({ ...k, risingRate: risingRateMap[k.keyword] || 0 }))
       .filter(k => k.risingRate > 0)
       .sort((a, b) => b.risingRate - a.risingRate)
       .slice(0, 10);
 
-    console.log('[ranked] top3:', ranked.slice(0, 3).map(k => k.keyword));
+    console.log('[ranked] top3:', finalRanked.slice(0, 3).map(k => k.keyword));
     console.log('[rising] top3:', risingRanked.slice(0, 3).map(k => `${k.keyword}(${Math.round(k.risingRate)}%)`));
     console.log('[trend 분포]', {
-      유행예감: ranked.filter(k => k.trend === '유행예감').length,
-      유행중: ranked.filter(k => k.trend === '유행중').length,
-      유행지남: ranked.filter(k => k.trend === '유행지남').length,
+      유행예감: finalRanked.filter(k => k.trend === '유행예감').length,
+      유행중: finalRanked.filter(k => k.trend === '유행중').length,
+      유행지남: finalRanked.filter(k => k.trend === '유행지남').length,
     });
 
     // 8. 코멘트 생성
-    const commentsRaw = await generateComments(ranked.slice(0, 10));
-    const comments = ranked.slice(0, 10).map((_, i) => commentsRaw[String(i)] || '');
+    const commentsRaw = await generateComments(finalRanked.slice(0, 10));
+    const comments = finalRanked.slice(0, 10).map((_, i) => commentsRaw[String(i)] || '');
 
     // 9. KV 저장
     const result = {
       updatedAt: new Date().toISOString(),
-      keywords: ranked.map((k, i) => ({
+      keywords: finalRanked.map((k, i) => ({
         rank: i + 1,
         keyword: k.keyword,
         score: Math.round(k.score * 100),
