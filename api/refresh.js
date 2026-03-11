@@ -60,7 +60,7 @@ async function extractNounsWithClova(titles) {
 규칙:
 - 동사, 형용사, 조사, 어미 제외
 - 2글자 이상 한국어 명사만
-- 브랜드명, 인명, 지명 제외
+- 브랜드명, 인명, 지명, 특정 업체명, 지역+업종 조합 제외 (예: 산곡동 헬스장, 강남 카페)
 - 너무 일반적인 단어 제외 (것, 수, 때, 일상, 생활 등)
 - 2회 이상 등장한 단어만
 - 빈도 높은 순으로 최대 40개
@@ -78,7 +78,7 @@ async function extractNounsWithClova(titles) {
     const data = await res.json();
     const text = data.result?.message?.content || '{}';
     const parsed = JSON.parse(text.replace(/```json|```/g, '').trim());
-    const keywords = parsed.keywords || [];
+    const keywords = (parsed.keywords || []).map(k => k.trim()).filter(k => k.length >= 2);
     console.log('[extractNouns] clova extracted:', keywords.slice(0, 10));
     return keywords;
   } catch (e) {
