@@ -625,6 +625,16 @@
 
     <div class="card">
       <div class="card-header">
+        <div>
+          <div class="card-title">🔥 급상승</div>
+          <div class="card-sub">최근 3일 급상승 키워드</div>
+        </div>
+      </div>
+      <div id="risingList" style="padding:8px 0;"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
         <div class="card-title">현황</div>
       </div>
       <div class="info-grid">
@@ -742,6 +752,18 @@ function renderAll(data) {
       <div class="top5-change" style="color:${CHART_COLORS[i]}">${kw.changeRate > 0 ? '+' : ''}${kw.changeRate}%</div>
     </div>
   `).join('');
+
+  // Rising list
+  const rising = data.rising || [];
+  document.getElementById('risingList').innerHTML = rising.slice(0, 5).map((kw, i) => `
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 20px;border-bottom:1px solid var(--border-light);">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:11px;font-weight:700;color:var(--text-muted);min-width:16px;">${i+1}</span>
+        <span style="font-size:13px;font-weight:600;color:var(--text);">${kw.keyword}</span>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:var(--red);">▲${kw.risingRate}%</span>
+    </div>
+  `).join('') || '<div style="padding:16px 20px;color:var(--text-muted);font-size:13px;">데이터 없음</div>';
 
   document.getElementById('sidebar').style.display = 'flex';
 
