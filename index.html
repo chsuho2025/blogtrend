@@ -286,13 +286,9 @@
       grid-template-columns: 48px 1fr 100px 80px 64px;
       padding: 11px 20px;
       align-items: center;
-      border-bottom: 1px solid var(--border-light);
       transition: background 0.1s;
-      cursor: default;
+      cursor: pointer;
     }
-
-    .rank-row:last-child { border-bottom: none; }
-    .rank-row:hover { background: #FAFBFC; }
 
     .rank-row.highlight { background: #FFFEF0; }
 
@@ -415,6 +411,74 @@
       background: #F0F2F5;
     }
     .rank-row.yebo-row { background: #FDFBFF; }
+
+    /* POSTS PANEL */
+    .rank-item-wrap {
+      border-bottom: 1px solid var(--border-light);
+    }
+    .rank-item-wrap:last-child { border-bottom: none; }
+
+    .rank-row {
+      cursor: pointer;
+    }
+    .rank-row:hover { background: #F7F8FA; }
+    .rank-row.active { background: #F0FDF6; }
+
+    .posts-panel {
+      display: none;
+      flex-direction: column;
+      gap: 0;
+      background: #FAFBFC;
+      border-top: 1px solid var(--border-light);
+    }
+    .posts-panel.open { display: flex; }
+
+    .post-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 12px 20px 12px 60px;
+      border-bottom: 1px solid var(--border-light);
+      text-decoration: none;
+      transition: background 0.1s;
+    }
+    .post-item:last-child { border-bottom: none; }
+    .post-item:hover { background: #F0FDF6; }
+
+    .post-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .post-desc {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 1;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .post-meta {
+      font-size: 11px;
+      color: var(--text-placeholder);
+      margin-top: 1px;
+    }
+    .posts-loading {
+      padding: 14px 20px 14px 60px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+    .chart-wrap {
+      padding: 24px 20px 16px;
+      height: 240px;
+    }
+    .period-tabs button { cursor: pointer; }
 
     /* SIDEBAR */
     .sidebar {
@@ -808,58 +872,118 @@ function renderAll(data) {
   `;
 
   // Render rank list
+  const logMax = Math.log10(Math.max(...kws.map(k => k.postCount), 10));
   document.getElementById('rankList').innerHTML = kws.map((kw, i) => {
     const isTop5 = kw.rank <= 5;
     const colorIdx = Math.min(i, CHART_COLORS.length - 1);
-    const scoreW = Math.round((kw.score / maxScore) * 100);
+    const logPost = kw.postCount > 0 ? Math.log10(kw.postCount) : 0;
+    const scoreW = Math.round((logPost / logMax) * 100);
     const numClass = kw.rank === 1 ? 'gold' : kw.rank === 2 ? 'silver' : kw.rank === 3 ? 'bronze' : '';
-    const isHot = kw.changeRate >= 50;
     const trendBadge = kw.trend === '유행예감'
       ? '<span class="trend-badge yebo">🔮 유행예감</span>'
       : kw.trend === '유행중'
       ? '<span class="trend-badge yujung">🔥 유행중</span>'
       : '<span class="trend-badge yuji">📉 유행지남</span>';
-    const rowClass = kw.trend === '유행예감' ? 'yebo-row' : isHot ? 'highlight' : '';
+    const rowClass = kw.trend === '유행예감' ? 'yebo-row' : '';
 
     return `
-      <div class="rank-row ${rowClass}">
-        <div class="rank-num ${numClass}">${kw.rank}</div>
-        <div class="rank-keyword">
-          ${isTop5 ? `<div class="color-bar" style="background:${CHART_COLORS[colorIdx]}"></div>` : '<div style="width:3px"></div>'}
-          <div style="min-width:0">
-            <div style="display:flex;align-items:center;gap:6px">
-              <span class="keyword-name">${kw.keyword}</span>
-              ${trendBadge}
+      <div class="rank-item-wrap">
+        <div class="rank-row ${rowClass}" onclick="togglePosts(this, '${kw.keyword.replace(/'/g, "\'")}')">
+          <div class="rank-num ${numClass}">${kw.rank}</div>
+          <div class="rank-keyword">
+            ${isTop5 ? `<div class="color-bar" style="background:${CHART_COLORS[colorIdx]}"></div>` : '<div style="width:3px"></div>'}
+            <div style="min-width:0">
+              <div style="display:flex;align-items:center;gap:6px">
+                <span class="keyword-name">${kw.keyword}</span>
+                ${trendBadge}
+              </div>
+              ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
             </div>
-            ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
+          </div>
+          <div class="rank-score">${changeText(kw.changeRate)}</div>
+          <div class="rank-change" style="font-size:12px;color:var(--text-muted);">${kw.postCount > 0 ? kw.postCount.toLocaleString() : '-'}</div>
+          <div class="rank-bar-cell">
+            <div class="rank-bar-outer">
+              <div class="rank-bar-inner" style="width:${scoreW}%"></div>
+            </div>
           </div>
         </div>
-        <div class="rank-score">${changeText(kw.changeRate)}</div>
-        <div class="rank-change" style="font-size:12px;color:var(--text-muted);">${kw.postCount > 0 ? kw.postCount.toLocaleString() : '-'}</div>
-        <div class="rank-bar-cell">
-          <div class="rank-bar-outer">
-            <div class="rank-bar-inner" style="width:${scoreW}%"></div>
-          </div>
+        <div class="posts-panel" id="posts-${i}">
+          <div class="posts-loading">불러오는 중...</div>
         </div>
       </div>
     `;
   }).join('');
 
-  drawChart(top5);
+  drawChart(top5, 7);
+  setupPeriodTabs(top5);
 }
 
-function drawChart(top5) {
+let currentOpenIdx = null;
+
+async function togglePosts(row, keyword) {
+  const wrap = row.parentElement;
+  const panel = wrap.querySelector('.posts-panel');
+  const isOpen = panel.classList.contains('open');
+
+  // 열려있는 패널 닫기
+  document.querySelectorAll('.posts-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.rank-row.active').forEach(r => r.classList.remove('active'));
+
+  if (isOpen) return;
+
+  panel.classList.add('open');
+  row.classList.add('active');
+
+  // 이미 로딩된 경우 스킵
+  if (panel.dataset.loaded) return;
+
+  try {
+    const res = await fetch('/api/posts?keyword=' + encodeURIComponent(keyword));
+    const data = await res.json();
+    const posts = data.posts || [];
+    if (!posts.length) {
+      panel.innerHTML = '<div class="posts-loading">관련 게시글이 없습니다.</div>';
+    } else {
+      panel.innerHTML = posts.map(p => `
+        <a class="post-item" href="${p.link}" target="_blank" rel="noopener">
+          <div class="post-title">${p.title}</div>
+          <div class="post-desc">${p.description}</div>
+          <div class="post-meta">${p.bloggerName} · ${p.postdate.slice(0,4)}.${p.postdate.slice(4,6)}.${p.postdate.slice(6,8)}</div>
+        </a>
+      `).join('');
+    }
+    panel.dataset.loaded = '1';
+  } catch(e) {
+    panel.innerHTML = '<div class="posts-loading">불러오기 실패</div>';
+  }
+}
+
+function setupPeriodTabs(top5) {
+  const tabs = document.querySelectorAll('.period-tab');
+  const periods = [7, 14, 28];
+  tabs.forEach((tab, i) => {
+    tab.onclick = () => {
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      drawChart(top5, periods[i]);
+    };
+  });
+}
+
+function drawChart(top5, days = 7) {
   if (chartInstance) chartInstance.destroy();
   const ctx = document.getElementById('trendChart').getContext('2d');
-  const labels = Array.from({length: 7}, (_, i) => {
+  const labels = Array.from({length: days}, (_, i) => {
     const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
+    d.setDate(d.getDate() - (days - 1 - i));
     return `${d.getMonth()+1}/${d.getDate()}`;
   });
 
   const datasets = top5.map((kw, i) => {
-    const raw = (kw.values && kw.values.length >= 7) ? kw.values.slice(-7) : Array.from({length: 7}, () => 0);
-    // 각 키워드를 0~100으로 정규화 (상대적 변화 비교)
+    const allVals = kw.values || [];
+    const raw = allVals.length >= days ? allVals.slice(-days) : Array.from({length: days}, () => 0);
+    // 각 키워드를 0~100으로 정규화
     const maxVal = Math.max(...raw, 1);
     const minVal = Math.min(...raw);
     const range = maxVal - minVal || 1;
