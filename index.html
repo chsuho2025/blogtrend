@@ -715,9 +715,10 @@ function fmtShort(iso) {
 }
 
 function changeText(rate) {
-  if (rate > 5) return `<span class="up">▲${rate}%</span>`;
+  if (rate >= 100) return `<span class="up" style="font-weight:800;">🔥+${rate}%</span>`;
+  if (rate > 0) return `<span class="up">▲+${rate}%</span>`;
   if (rate < -5) return `<span class="down">▼${Math.abs(rate)}%</span>`;
-  return `<span class="flat-color">-</span>`;
+  return `<span class="flat-color">보합</span>`;
 }
 
 function renderAll(data) {
@@ -797,8 +798,8 @@ function renderAll(data) {
         <div class="rank-table-header">
           <span>순위</span>
           <span>키워드</span>
-          <span style="text-align:right">트렌드 점수</span>
-          <span style="text-align:right">검색 증감</span>
+          <span style="text-align:right">주간 변화율</span>
+          <span style="text-align:right">포스팅 수</span>
           <span style="text-align:right">비중</span>
         </div>
         <div id="rankList"></div>
@@ -833,8 +834,8 @@ function renderAll(data) {
             ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
           </div>
         </div>
-        <div class="rank-score">${kw.score}</div>
-        <div class="rank-change">${changeText(kw.changeRate)}</div>
+        <div class="rank-score">${changeText(kw.changeRate)}</div>
+        <div class="rank-change" style="font-size:12px;color:var(--text-muted);">${kw.postCount > 0 ? kw.postCount.toLocaleString() : '-'}</div>
         <div class="rank-bar-cell">
           <div class="rank-bar-outer">
             <div class="rank-bar-inner" style="width:${scoreW}%"></div>
@@ -857,20 +858,20 @@ function drawChart(top5) {
   });
 
   const datasets = top5.map((kw, i) => {
-    const base = 30 + Math.random() * 20;
-    const points = Array.from({length: 7}, (_, j) => {
-      const trend = (kw.changeRate / 100) * (j / 6) * 35;
-      return Math.max(5, base + trend + (Math.random() - 0.5) * 8);
-    });
+    // 실제 DataLab values 사용 (없으면 빈 배열)
+    const points = (kw.values && kw.values.length >= 7)
+      ? kw.values.slice(-7)
+      : Array.from({length: 7}, () => 0);
     return {
       label: kw.keyword,
       data: points,
       borderColor: CHART_COLORS[i],
-      backgroundColor: 'transparent',
+      backgroundColor: CHART_COLORS[i] + '18',
       borderWidth: 2,
       pointRadius: 3,
       pointHoverRadius: 5,
       tension: 0.4,
+      fill: false,
     };
   });
 
