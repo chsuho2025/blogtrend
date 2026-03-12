@@ -312,9 +312,12 @@ async function generateComments(topKeywords) {
 // 유틸
 // ─────────────────────────────────────────
 function classifyTrend(changeRate, postCount, medianPostCount) {
-  if (changeRate > 15 && postCount < medianPostCount * 1.5) return '유행예감';
-  if (changeRate <= 0) return '유행지남';
-  return '유행중';
+  // 유행예감: 검색 급증 + 아직 포스팅 적음 (막 뜨기 시작)
+  if (changeRate >= 30 && postCount < medianPostCount) return '유행예감';
+  // 유행중: 검색 증가 중
+  if (changeRate > 0) return '유행중';
+  // 유행지남: 변화 없거나 하락
+  return '유행지남';
 }
 
 function getDateString(daysOffset) {
@@ -380,18 +383,22 @@ module.exports = async (req, res) => {
     const ranked = weeklyTrends.map((t, i) => {
       const postCount = postCountMap[t.keyword] || 0;
       const normalizedPost = postCount / maxPost;
-      const score = normalizedRates[i] * 0.5 + (t.changeRate > 0 ? 0.3 : 0) + normalizedPost * 0.2;
+      const score = normalizedRates[i] * 0.75 + normalizedPost * 0.1 + (t.changeRate > 50 ? 0.15 : t.changeRate > 10 ? 0.08 : 0);
       const trend = classifyTrend(t.changeRate, postCount, medianPost);
       return { keyword: t.keyword, score, changeRate: t.changeRate, postCount, trend };
     }).sort((a, b) => b.score - a.score);
 
-    // 중복 키워드 제거 (같은 베이스 키워드면 점수 높은 것만 유지)
+    // 중복 키워드 제거
+    function getBase(kw) {
+      return kw.replace(/(레시피|추천|후기|방법|종류|효능|비교|순위|가격|사용법|퍼퓸|프리미엄|정품)/g, '').replace(/\s+/g, ' ').trim();
+    }
     const deduped = [];
     for (const item of ranked) {
-      const base = item.keyword.replace(/(레시피|추천|후기|방법|종류|효능|비교|순위|가격|사용법|\s+\S+$)/, '').trim();
+      const base = getBase(item.keyword);
       const isDup = deduped.some(d => {
-        const dBase = d.keyword.replace(/(레시피|추천|후기|방법|종류|효능|비교|순위|가격|사용법|\s+\S+$)/, '').trim();
-        return d.keyword.startsWith(base) || item.keyword.startsWith(dBase) || base === dBase;
+        const dBase = getBase(d.keyword);
+        return d.keyword.includes(base) || item.keyword.includes(dBase) || base === dBase ||
+          (base.length > 3 && dBase.includes(base)) || (dBase.length > 3 && base.includes(dBase));
       });
       if (!isDup) deduped.push(item);
     }
@@ -420,15 +427,19 @@ module.exports = async (req, res) => {
     // 9. KV 저장
     const result = {
       updatedAt: new Date().toISOString(),
-      keywords: finalRanked.map((k, i) => ({
-        rank: i + 1,
-        keyword: k.keyword,
-        score: Math.round(k.score * 100),
-        changeRate: Math.round(k.changeRate),
-        postCount: k.postCount,
-        trend: k.trend,
-        comment: comments[i] || '',
-      })),
+      keywords: finalRanked.map((k, i) => {
+        const trendData = weeklyTrends.find(t => t.keyword === k.keyword);
+        return {
+          rank: i + 1,
+          keyword: k.keyword,
+          score: Math.round(k.score * 100),
+          changeRate: Math.round(k.changeRate),
+          postCount: k.postCount,
+          trend: k.trend,
+          comment: comments[i] || '',
+          values: trendData ? trendData.values.slice(-7) : [],
+        };
+      }),
       rising: risingRanked.map((k, i) => ({
         rank: i + 1,
         keyword: k.keyword,
