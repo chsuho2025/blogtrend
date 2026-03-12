@@ -386,19 +386,24 @@ module.exports = async (req, res) => {
       const score = normalizedRates[i] * 0.75 + normalizedPost * 0.1 + (t.changeRate > 50 ? 0.15 : t.changeRate > 10 ? 0.08 : 0);
       const trend = classifyTrend(t.changeRate, postCount, medianPost);
       return { keyword: t.keyword, score, changeRate: t.changeRate, postCount, trend };
-    }).sort((a, b) => b.score - a.score);
+    })
+    .filter(t => t.postCount < 500000) // 포스팅 50만 초과 = 너무 광범위한 키워드 제외
+    .sort((a, b) => b.score - a.score);
 
-    // 중복 키워드 제거
+    // 중복 키워드 제거 - 한 키워드가 다른 키워드를 완전히 포함할 때만 제거
     function getBase(kw) {
-      return kw.replace(/(레시피|추천|후기|방법|종류|효능|비교|순위|가격|사용법|퍼퓸|프리미엄|정품)/g, '').replace(/\s+/g, ' ').trim();
+      return kw.replace(/(레시피|추천|후기|방법|효능|사용법|퍼퓸|프리미엄|정품)$/g, '').replace(/\s+/g, ' ').trim();
     }
     const deduped = [];
     for (const item of ranked) {
       const base = getBase(item.keyword);
       const isDup = deduped.some(d => {
         const dBase = getBase(d.keyword);
-        return d.keyword.includes(base) || item.keyword.includes(dBase) || base === dBase ||
-          (base.length > 3 && dBase.includes(base)) || (dBase.length > 3 && base.includes(dBase));
+        // 완전히 같은 베이스이거나, 한쪽이 다른쪽을 포함(4글자 이상일 때만)
+        if (base === dBase) return true;
+        if (base.length >= 4 && dBase.includes(base)) return true;
+        if (dBase.length >= 4 && base.includes(dBase)) return true;
+        return false;
       });
       if (!isDup) deduped.push(item);
     }
