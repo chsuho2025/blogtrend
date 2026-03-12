@@ -378,7 +378,10 @@ module.exports = async (req, res) => {
     const changeRates = weeklyTrends.map(t => t.changeRate);
     const normalizedRates = normalize(changeRates);
     const postCountMap = Object.fromEntries(postCounts.map(p => [p.keyword, p.total]));
-    const maxPost = Math.max(...postValues, 1);
+    const sortedPostValues = [...postValues].sort((a, b) => a - b);
+    // 상위 20% 이상치 제외한 최대값으로 정규화
+    const p80 = sortedPostValues[Math.floor(sortedPostValues.length * 0.8)] || 1;
+    const maxPost = p80;
 
     const ranked = weeklyTrends.map((t, i) => {
       const postCount = postCountMap[t.keyword] || 0;
@@ -390,20 +393,19 @@ module.exports = async (req, res) => {
     .filter(t => t.postCount < 500000) // 포스팅 50만 초과 = 너무 광범위한 키워드 제외
     .sort((a, b) => b.score - a.score);
 
-    // 중복 키워드 제거 - 한 키워드가 다른 키워드를 완전히 포함할 때만 제거
-    function getBase(kw) {
-      return kw.replace(/(레시피|추천|후기|방법|효능|사용법|퍼퓸|프리미엄|정품)$/g, '').replace(/\s+/g, ' ').trim();
+    // 중복 키워드 제거
+    // 전략: 키워드 쌍을 비교해서 한쪽이 다른쪽을 포함하면 점수 높은 것만 남김
+    function normalize(kw) {
+      return kw.replace(/(레시피|추천|후기|방법|효능|사용법|퍼퓸|프리미엄|정품)/g, '').replace(/\s+/g, '').trim();
     }
     const deduped = [];
     for (const item of ranked) {
-      const base = getBase(item.keyword);
+      const normItem = normalize(item.keyword);
       const isDup = deduped.some(d => {
-        const dBase = getBase(d.keyword);
-        // 완전히 같은 베이스이거나, 한쪽이 다른쪽을 포함(4글자 이상일 때만)
-        if (base === dBase) return true;
-        if (base.length >= 4 && dBase.includes(base)) return true;
-        if (dBase.length >= 4 && base.includes(dBase)) return true;
-        return false;
+        const normD = normalize(d.keyword);
+        // 공백 제거 후 한쪽이 다른쪽에 포함되는 경우
+        const overlap = normItem.includes(normD) || normD.includes(normItem);
+        return overlap;
       });
       if (!isDup) deduped.push(item);
     }
