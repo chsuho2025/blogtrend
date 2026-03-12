@@ -378,10 +378,7 @@ module.exports = async (req, res) => {
     const changeRates = weeklyTrends.map(t => t.changeRate);
     const normalizedRates = normalize(changeRates);
     const postCountMap = Object.fromEntries(postCounts.map(p => [p.keyword, p.total]));
-    const sortedPostValues = [...postValues].sort((a, b) => a - b);
-    // 상위 20% 이상치 제외한 최대값으로 정규화
-    const p80 = sortedPostValues[Math.floor(sortedPostValues.length * 0.8)] || 1;
-    const maxPost = p80;
+    const maxPost = Math.max(...postValues, 1);
 
     const ranked = weeklyTrends.map((t, i) => {
       const postCount = postCountMap[t.keyword] || 0;
@@ -404,9 +401,11 @@ module.exports = async (req, res) => {
       const normItem = normKw(item.keyword);
       const isDup = deduped.some(d => {
         const normD = normKw(d.keyword);
-        // 공백 제거 후 한쪽이 다른쪽에 포함되는 경우
-        const overlap = normItem.includes(normD) || normD.includes(normItem);
-        return overlap;
+        // 한쪽이 다른쪽에 포함되는 경우 - 이미 deduped에 있는 게 더 짧으면(일반적) item은 중복
+        if (normItem.includes(normD) && normD.length <= normItem.length) return true;
+        // deduped에 있는 게 더 길면(구체적) item이 더 일반적 → item 유지, d 제거는 별도 처리
+        if (normD.includes(normItem) && normItem.length <= normD.length) return true;
+        return false;
       });
       if (!isDup) deduped.push(item);
     }
