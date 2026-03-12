@@ -395,14 +395,15 @@ module.exports = async (req, res) => {
 
     // 중복 키워드 제거
     // 전략: 키워드 쌍을 비교해서 한쪽이 다른쪽을 포함하면 점수 높은 것만 남김
-    function normalize(kw) {
+    function normKw(kw) {
+      if (typeof kw !== 'string') return '';
       return kw.replace(/(레시피|추천|후기|방법|효능|사용법|퍼퓸|프리미엄|정품)/g, '').replace(/\s+/g, '').trim();
     }
     const deduped = [];
     for (const item of ranked) {
-      const normItem = normalize(item.keyword);
+      const normItem = normKw(item.keyword);
       const isDup = deduped.some(d => {
-        const normD = normalize(d.keyword);
+        const normD = normKw(d.keyword);
         // 공백 제거 후 한쪽이 다른쪽에 포함되는 경우
         const overlap = normItem.includes(normD) || normD.includes(normItem);
         return overlap;
