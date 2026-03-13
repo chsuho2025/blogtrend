@@ -137,9 +137,7 @@ async function extractTrendKeywords(titles) {
         }
       );
       const data = await res.json();
-      if (data.result?.message?.content === undefined) {
-        console.log(`[extractTrendKeywords] chunk${Math.floor(i/CHUNK_SIZE)+1} 응답 구조:`, JSON.stringify(data).slice(0, 300));
-      }
+      console.log(`[extractTrendKeywords] chunk${Math.floor(i/CHUNK_SIZE)+1} 응답:`, JSON.stringify(data).slice(0, 400));
       const text = data.result?.message?.content || data.choices?.[0]?.message?.content || '[]';
       const cleaned = text.replace(/```json|```/g, '').trim();
       const keywords = JSON.parse(cleaned);
