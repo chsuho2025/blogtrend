@@ -47,7 +47,15 @@ async function collectBlogTitles() {
       if (data.items) {
         rawCount += data.items.length;
         for (const item of data.items) {
-          const title = item.title.replace(/<[^>]+>/g, '').trim();
+          const title = item.title
+            .replace(/<[^>]+>/g, '')
+            .replace(/&amp;/g, '&')
+            .replace(/&quot;/g, '"')
+            .replace(/&lt;/g, '<')
+            .replace(/&gt;/g, '>')
+            .replace(/&apos;/g, "'")
+            .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c))
+            .trim();
           if (!seenTitles.has(title)) {
             seenTitles.add(title);
             allTitles.push(title);
@@ -83,6 +91,7 @@ function countFrequency(titles) {
     for (const token of tokens) {
       if (/^\d+$/.test(token)) continue;
       if (/^[a-zA-Z]{1,2}$/.test(token)) continue;
+      if (['quot', 'amp', 'lt', 'gt', 'apos', 'nbsp'].includes(token.toLowerCase())) continue;
       freqMap.set(token, (freqMap.get(token) || 0) + 1);
     }
 
