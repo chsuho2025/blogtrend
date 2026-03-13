@@ -115,12 +115,14 @@ async function extractTrendKeywords(titles) {
 - 제목에 2번 이상 등장하는 키워드 우선
 
 반드시 제외:
-- 맛집, 카페, 추천, 후기, 리뷰, 정리, 오늘, 진짜, 완전, 정말 같은 일반 단어
+- 간식, 샴푸, 노래, 도시락, 운동, 쇼핑, 음식, 청소, 요리, 패션 같은 카테고리 단어
+- 맛집, 카페, 추천, 후기, 리뷰, 정리, 오늘, 진짜, 완전, 정말, 좋아요 같은 일반 단어
 - 날짜, 연도 (3월, 2026 등)
-- 지역명+업종 조합 (예: 학익동 맛집, 김포 공장, 광주 미용실, 통영 분양)
+- 지역명+업종 조합 (예: 학익동 맛집, 김포 공장, 광주 미용실)
 - 지역명 단독 (서울, 부산, 인천 등)
-- 특정 상호명, 업체명 (예: 비아스튜디오, 골드앤무드, 써니씨드업)
+- 특정 상호명, 업체명 (예: 비아스튜디오, 골드앤무드)
 - 사람 이름, 뉴스성 키워드, 사건사고
+- 브랜드명만 있고 구체적 제품명 없는 것 (예: 다이소, 이마트 단독은 제외, 다이소 추천템은 가능)
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
@@ -231,8 +233,11 @@ function verifyFrequency(pickedKeywords, titles) {
   const normalizedTitles = titles.map(normalizeStr);
 
   const verified = [];
+  const seenNorm = new Set();
   for (const kw of pickedKeywords) {
     const normKw = normalizeStr(kw);
+    if (seenNorm.has(normKw)) continue; // 띄어쓰기만 다른 중복 제거
+    seenNorm.add(normKw);
     const count = normalizedTitles.filter(t => t.includes(normKw)).length;
     verified.push({ keyword: kw, titleCount: count });
   }
@@ -261,8 +266,10 @@ async function updateKeywordPool(newKeywords) {
     console.log('[updateKeywordPool] pool 로드 실패, 새로 시작:', e.message);
   }
 
-  // 새 키워드 우선, 기존 풀에서 새 키워드와 중복 제거 후 뒤에 붙임
-  const oldPool = pool.filter(k => !newKeywords.includes(k));
+  // 새 키워드 우선, 공백제거 기준 중복 제거 후 뒤에 붙임
+  const norm = s => s.replace(/\s+/g, '').toLowerCase();
+  const newNorms = new Set(newKeywords.map(norm));
+  const oldPool = pool.filter(k => !newNorms.has(norm(k)));
   const merged = [...newKeywords, ...oldPool].slice(0, 100);
 
   await redis.set('keyword_pool', JSON.stringify(merged));
