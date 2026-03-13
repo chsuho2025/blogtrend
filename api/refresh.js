@@ -31,7 +31,10 @@ async function collectBlogTitles() {
     /(?:서울|부산|인천|대구|광주|대전|울산|수원|성남|고양|용인|창원|청주|전주|천안|안산|안양|남양주|화성|평택|의정부|시흥|파주|김포|광명|광주시|하남|양주|구리|오산|군포|의왕|포천|동두천|가평|여주|이천|안성|양평)[가-힣\s]{1,10}(?:맛집|카페|헬스|병원|학원|부동산|공인중개|인테리어|치과|피부과|한의원|미용실|네일|네일샵|분양|아파트|오피스텔)/,
   ];
 
-  await Promise.all(NET_KEYWORDS.map(async (keyword) => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  for (const keyword of NET_KEYWORDS) {
+    await sleep(100);
     try {
       const url = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=50&sort=date`;
       const res = await fetch(url, {
@@ -56,7 +59,7 @@ async function collectBlogTitles() {
     } catch (e) {
       console.log(`[collectBlogTitles] ${keyword} 오류:`, e.message);
     }
-  }));
+  }
 
   const filtered = allTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
   console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (API응답: ${rawCount}개, 중복제거: ${allTitles.length}개, 노이즈제거: ${filtered.length}개)`);
