@@ -144,26 +144,63 @@ async function extractTrendKeywords(titles) {
 }
 
 // ─────────────────────────────────────────
-// Step 3: verifyFrequency — 실제 제목 존재 검증
+// Step 3: filterKeywords — HCX-007 최종 검증
 // ─────────────────────────────────────────
-function verifyFrequency(keywords, titles) {
-  const norm = s => s.replace(/\s+/g, '').toLowerCase();
-  const normalizedTitles = titles.map(norm);
-  const seenNorm = new Set();
-  const verified = [];
+async function filterKeywords(keywords) {
+  const kwList = keywords.map((k, i) => `${i}:${k}`).join('\n');
+  try {
+    const res = await fetch(
+      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `아래는 네이버 블로그 제목에서 추출한 키워드 후보야.
+이 중에서 "지금 네이버 블로그 창작자가 포스팅 주제로 쓸 만한 트렌드 키워드"의 번호만 골라줘.
 
-  for (const kw of keywords) {
-    const n = norm(kw);
-    if (seenNorm.has(n)) continue;
-    seenNorm.add(n);
-    const count = normalizedTitles.filter(t => t.includes(n)).length;
-    if (count >= 1) verified.push({ keyword: kw, titleCount: count });
+통과 기준:
+- 요즘 특별히 주목받는 구체적인 제품명, 음식명, 챌린지명
+- 브랜드+제품 조합 (갤럭시 S26, 오뚜기 진밀면 등)
+- 트렌드어+행동 조합 (갓생루틴, 무지출챌린지 등)
+
+제거 기준:
+- 사건사고, 범죄, 뉴스성 단어 (예: 성매매, 합의금, 공소시효)
+- 특정 지역 일상, 여행기 (예: 슬로바키아 일상)
+- 가격 정보 단독 (예: 최저가 약 283만 원)
+- 상품 코드, 모델 번호만 있는 것 (예: M11815)
+- 지나치게 구체적인 상품명 전체 (30자 이상)
+- 카테고리 단어 단독 (예: 실내용 자전거, 반려동물 스텝)
+
+반드시 JSON 배열로만: [통과할번호, ...]
+다른 설명 없이 JSON만.`,
+            },
+            { role: 'user', content: kwList },
+          ],
+          maxCompletionTokens: 500,
+          temperature: 0.1,
+          repetitionPenalty: 1.0,
+          thinking: { effort: 'none' },
+        }),
+      }
+    );
+    const data = await res.json();
+    const text = data.result?.message?.content || '[]';
+    const passIndices = new Set(JSON.parse(text.replace(/```json|```/g, '').trim()));
+    const filtered = keywords.filter((_, i) => passIndices.has(i));
+    console.log(`[filterKeywords] ${keywords.length}개 → ${filtered.length}개`);
+    console.log('[filterKeywords] 통과:', filtered);
+    return filtered;
+  } catch (e) {
+    console.log('[filterKeywords] 실패, 원본 유지:', e.message);
+    return keywords;
   }
-
-  verified.sort((a, b) => b.titleCount - a.titleCount);
-  console.log(`[verifyFrequency] ${keywords.length}개 → 검증 후 ${verified.length}개`);
-  console.log('[verifyFrequency] 생존:', verified.map(k => `${k.keyword}(${k.titleCount})`));
-  return verified.map(k => k.keyword);
 }
 
 // ─────────────────────────────────────────
@@ -463,7 +500,7 @@ module.exports = async (req, res) => {
     const refined = await extractTrendKeywords(allTitles);
     if (!refined.length) throw new Error('키워드 추출 실패');
 
-    const verified = verifyFrequency(refined, allTitles);
+    const verified = await filterKeywords(refined);
 
     const keywordPool = await updateKeywordPool(verified);
     if (!keywordPool.length) throw new Error('키워드 풀 없음');
