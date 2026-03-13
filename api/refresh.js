@@ -50,6 +50,8 @@ async function collectBlogTitles() {
             allTitles.push(title);
           }
         }
+      } else {
+        console.log(`[collectBlogTitles] ${keyword} 빈응답:`, JSON.stringify(data).slice(0, 200));
       }
     } catch (e) {
       console.log(`[collectBlogTitles] ${keyword} 오류:`, e.message);
