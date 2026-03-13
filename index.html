@@ -4,39 +4,39 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>블로그 트렌드 레이더</title>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
       --green: #03C75A;
-      --green-light: #e8f9f0;
-      --green-mid: #b3efd1;
-      --red: #F04452;
-      --red-light: #fff0f1;
-      --blue: #1A73E8;
-      --bg: #F7F8FA;
-      --white: #ffffff;
-      --border: #E5E8ED;
-      --border-light: #F0F2F5;
-      --text: #191F28;
-      --text-sub: #4E5968;
-      --text-muted: #8B95A1;
-      --text-placeholder: #B0B8C1;
-      --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-      --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+      --green-dim: #E8F9F0;
+      --black: #111111;
+      --gray-1: #333333;
+      --gray-2: #555555;
+      --gray-3: #888888;
+      --gray-4: #BBBBBB;
+      --gray-5: #E8E8E8;
+      --gray-6: #F5F5F5;
+      --white: #FFFFFF;
+      --border: #EBEBEB;
+      --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
+      --shadow: 0 2px 12px rgba(0,0,0,0.08);
+      --radius: 12px;
+      --radius-sm: 8px;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'Noto Sans KR', sans-serif;
+      background: var(--gray-6);
+      color: var(--black);
+      font-family: 'Pretendard', -apple-system, sans-serif;
       font-size: 14px;
       line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* HEADER */
+    /* ── HEADER ── */
     header {
       background: var(--white);
       border-bottom: 1px solid var(--border);
@@ -46,7 +46,7 @@
     }
 
     .header-inner {
-      max-width: 1200px;
+      max-width: 1160px;
       margin: 0 auto;
       padding: 0 24px;
       height: 56px;
@@ -58,56 +58,58 @@
     .logo {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
     }
 
-    .logo-mark {
-      width: 28px;
-      height: 28px;
-      background: var(--green);
+    .logo-icon {
+      width: 26px;
+      height: 26px;
+      background: var(--black);
       border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .logo-name {
-      font-size: 16px;
-      font-weight: 800;
-      color: var(--text);
-      letter-spacing: -0.5px;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--black);
+      letter-spacing: -0.4px;
     }
 
-    .logo-beta {
+    .logo-badge {
       font-size: 10px;
-      font-weight: 700;
+      font-weight: 600;
       color: var(--green);
-      background: var(--green-light);
-      padding: 2px 6px;
-      border-radius: 4px;
-      letter-spacing: 0.3px;
+      background: var(--green-dim);
+      padding: 2px 7px;
+      border-radius: 20px;
+      letter-spacing: 0.2px;
     }
 
     .header-right {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 16px;
     }
 
     .update-info {
       font-size: 12px;
-      color: var(--text-muted);
+      color: var(--gray-3);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
 
     .live-dot {
-      display: inline-block;
       width: 6px;
       height: 6px;
       background: var(--green);
       border-radius: 50%;
-      margin-right: 5px;
-      animation: pulse 1.5s infinite;
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
     }
 
     @keyframes pulse {
@@ -116,16 +118,16 @@
     }
 
     .refresh-btn {
-      height: 34px;
+      height: 32px;
       padding: 0 14px;
       background: var(--white);
       border: 1px solid var(--border);
-      border-radius: 6px;
+      border-radius: 8px;
       font-size: 13px;
       font-weight: 500;
-      color: var(--text-sub);
+      color: var(--gray-2);
       cursor: pointer;
-      font-family: 'Noto Sans KR', sans-serif;
+      font-family: 'Pretendard', sans-serif;
       transition: all 0.15s;
       display: flex;
       align-items: center;
@@ -133,303 +135,258 @@
     }
 
     .refresh-btn:hover {
-      border-color: var(--green);
-      color: var(--green);
-      background: var(--green-light);
+      border-color: var(--black);
+      color: var(--black);
     }
 
-    .refresh-btn.loading {
-      opacity: 0.5;
-      pointer-events: none;
-    }
+    .refresh-btn.loading { opacity: 0.4; pointer-events: none; }
 
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spin { animation: spin 0.7s linear infinite; display: inline-block; }
 
-    .spin { animation: spin 0.8s linear infinite; display: inline-block; }
-
-    /* TICKER BAR */
+    /* ── TICKER ── */
     .ticker-bar {
       background: var(--white);
-      border-bottom: 1px solid var(--border-light);
-      padding: 0 24px;
+      border-bottom: 1px solid var(--border);
     }
 
     .ticker-inner {
-      max-width: 1200px;
+      max-width: 1160px;
       margin: 0 auto;
+      padding: 0 24px;
       display: flex;
-      gap: 0;
       overflow-x: auto;
       scrollbar-width: none;
     }
-
     .ticker-inner::-webkit-scrollbar { display: none; }
 
     .ticker-item {
-      padding: 10px 24px 10px 0;
+      padding: 9px 28px 9px 0;
+      margin-right: 28px;
       display: flex;
       align-items: center;
       gap: 8px;
       white-space: nowrap;
-      border-right: 1px solid var(--border-light);
-      margin-right: 24px;
-      font-size: 13px;
-    }
-
-    .ticker-item:last-child { border-right: none; }
-
-    .ticker-label {
-      color: var(--text-muted);
+      border-right: 1px solid var(--border);
       font-size: 12px;
     }
+    .ticker-item:last-child { border-right: none; }
 
-    .ticker-val {
-      font-weight: 700;
-      color: var(--text);
-      font-family: 'Roboto Mono', monospace;
-    }
+    .ticker-label { color: var(--gray-3); }
+    .ticker-val { font-weight: 700; color: var(--black); font-variant-numeric: tabular-nums; }
+    .ticker-val.up { color: var(--green); }
 
-    .up { color: var(--red); }
-    .down { color: var(--blue); }
-    .flat-color { color: var(--text-muted); }
-
-    /* MAIN */
+    /* ── LAYOUT ── */
     .main-wrap {
-      max-width: 1200px;
+      max-width: 1160px;
       margin: 0 auto;
       padding: 24px;
       display: grid;
-      grid-template-columns: 1fr 360px;
+      grid-template-columns: 1fr 340px;
       gap: 20px;
+      align-items: start;
     }
 
-    /* CARD */
+    /* ── CARD ── */
     .card {
       background: var(--white);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      box-shadow: var(--shadow);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
       overflow: hidden;
     }
 
+    .card + .card { margin-top: 16px; }
+
     .card-header {
-      padding: 18px 20px 14px;
-      border-bottom: 1px solid var(--border-light);
+      padding: 20px 20px 16px;
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
+      border-bottom: 1px solid var(--gray-6);
     }
 
     .card-title {
       font-size: 15px;
       font-weight: 700;
-      color: var(--text);
+      color: var(--black);
       letter-spacing: -0.3px;
     }
 
     .card-sub {
       font-size: 12px;
-      color: var(--text-muted);
-      margin-top: 2px;
+      color: var(--gray-3);
+      margin-top: 3px;
+      font-weight: 400;
     }
 
+    /* ── PERIOD TABS ── */
     .period-tabs {
       display: flex;
+      background: var(--gray-6);
+      border-radius: 8px;
+      padding: 2px;
       gap: 2px;
     }
 
     .period-tab {
-      padding: 4px 10px;
-      border-radius: 4px;
+      padding: 5px 12px;
+      border-radius: 6px;
       font-size: 12px;
       font-weight: 500;
       cursor: pointer;
-      color: var(--text-muted);
+      color: var(--gray-3);
       background: none;
       border: none;
-      font-family: 'Noto Sans KR', sans-serif;
+      font-family: 'Pretendard', sans-serif;
       transition: all 0.15s;
     }
+    .period-tab:hover { color: var(--black); }
+    .period-tab.active {
+      background: var(--white);
+      color: var(--black);
+      font-weight: 700;
+      box-shadow: var(--shadow-sm);
+    }
 
-    .period-tab:hover { background: var(--bg); color: var(--text); }
-    .period-tab.active { background: var(--green); color: #fff; font-weight: 700; }
-
-    /* CHART */
+    /* ── CHART ── */
     .chart-wrap {
       padding: 20px;
-      height: 200px;
+      height: 220px;
     }
 
-    /* TABLE */
-    .rank-table {
-      width: 100%;
-    }
-
+    /* ── RANK TABLE ── */
     .rank-table-header {
       display: grid;
-      grid-template-columns: 48px 1fr 100px 80px 64px;
+      grid-template-columns: 44px 1fr 96px 72px;
       padding: 8px 20px;
       font-size: 11px;
-      color: var(--text-muted);
-      font-weight: 500;
-      border-bottom: 1px solid var(--border-light);
-      letter-spacing: 0.3px;
+      color: var(--gray-4);
+      font-weight: 600;
+      letter-spacing: 0.2px;
+      text-transform: uppercase;
     }
-
     .rank-table-header span:not(:first-child) { text-align: right; }
+
+    .rank-item-wrap {
+      border-top: 1px solid var(--gray-6);
+    }
+    .rank-item-wrap:first-child { border-top: none; }
 
     .rank-row {
       display: grid;
-      grid-template-columns: 48px 1fr 100px 80px 64px;
-      padding: 11px 20px;
+      grid-template-columns: 44px 1fr 96px 72px;
+      padding: 13px 20px;
       align-items: center;
-      transition: background 0.1s;
       cursor: pointer;
+      transition: background 0.1s;
     }
-
-    .rank-row.highlight { background: #FFFEF0; }
+    .rank-row:hover { background: var(--gray-6); }
+    .rank-row.active { background: #F0FDF6; }
 
     .rank-num {
       font-size: 14px;
       font-weight: 700;
-      color: var(--text-muted);
-      font-family: 'Roboto Mono', monospace;
+      color: var(--gray-4);
+      font-variant-numeric: tabular-nums;
     }
-
-    .rank-num.gold { color: #F5A623; }
-    .rank-num.silver { color: #8B95A1; }
-    .rank-num.bronze { color: #CD7F32; }
+    .rank-num.top1 { color: var(--black); font-size: 16px; }
+    .rank-num.top2 { color: var(--gray-2); }
+    .rank-num.top3 { color: var(--gray-3); }
 
     .rank-keyword {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       min-width: 0;
     }
 
-    .color-bar {
+    .rank-accent {
       width: 3px;
-      height: 28px;
+      height: 24px;
       border-radius: 2px;
+      background: var(--gray-5);
       flex-shrink: 0;
     }
+
+    .keyword-inner { min-width: 0; }
 
     .keyword-name {
       font-size: 14px;
       font-weight: 600;
-      color: var(--text);
+      color: var(--black);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
+      letter-spacing: -0.2px;
     }
 
     .keyword-comment {
       font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 1px;
+      color: var(--gray-3);
+      margin-top: 2px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .rank-score {
-      text-align: right;
-      font-family: 'Roboto Mono', monospace;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
+    .keyword-badges {
+      display: flex;
+      gap: 4px;
+      margin-top: 3px;
+      flex-wrap: wrap;
     }
 
-    .rank-change {
-      text-align: right;
-      font-family: 'Roboto Mono', monospace;
-      font-size: 13px;
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      font-size: 10px;
       font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.1px;
+      flex-shrink: 0;
     }
+    .badge-new { color: var(--green); background: var(--green-dim); }
+    .badge-hot { color: #E03131; background: #FFF0F0; }
+    .badge-up { color: var(--gray-2); background: var(--gray-6); }
+    .badge-down { color: var(--gray-4); background: var(--gray-6); }
 
-    .rank-bar-cell {
+    .rank-rate {
+      text-align: right;
+      font-size: 13px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+    .rank-rate.up { color: var(--black); }
+    .rank-rate.down { color: var(--gray-4); }
+    .rank-rate.flat { color: var(--gray-4); font-weight: 500; }
+
+    .rank-bar-wrap {
       display: flex;
       justify-content: flex-end;
       align-items: center;
     }
-
-    .rank-bar-outer {
-      width: 48px;
-      height: 4px;
-      background: var(--border-light);
+    .rank-bar-track {
+      width: 52px;
+      height: 3px;
+      background: var(--gray-5);
       border-radius: 2px;
       overflow: hidden;
     }
-
-    .rank-bar-inner {
+    .rank-bar-fill {
       height: 100%;
       background: var(--green);
       border-radius: 2px;
-      transition: width 1.2s ease;
+      transition: width 1s ease;
     }
 
-    /* HOT BADGE */
-    .hot-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--red);
-      background: var(--red-light);
-      padding: 2px 5px;
-      border-radius: 3px;
-      letter-spacing: 0.3px;
-      flex-shrink: 0;
-    }
-
-    /* TREND BADGES */
-    .trend-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      font-size: 10px;
-      font-weight: 700;
-      padding: 2px 6px;
-      border-radius: 3px;
-      letter-spacing: 0.3px;
-      flex-shrink: 0;
-    }
-    .trend-badge.yebo {
-      color: #7C3AED;
-      background: #F3EEFF;
-    }
-    .trend-badge.yujung {
-      color: #03C75A;
-      background: #E8F9F0;
-    }
-    .trend-badge.yuji {
-      color: #8B95A1;
-      background: #F0F2F5;
-    }
-    .rank-row.yebo-row { background: #FDFBFF; }
-
-    /* POSTS PANEL */
-    .rank-item-wrap {
-      border-bottom: 1px solid var(--border-light);
-    }
-    .rank-item-wrap:last-child { border-bottom: none; }
-
-    .rank-row {
-      cursor: pointer;
-    }
-    .rank-row:hover { background: #F7F8FA; }
-    .rank-row.active { background: #F0FDF6; }
-
+    /* ── POSTS PANEL ── */
     .posts-panel {
       display: none;
       flex-direction: column;
-      gap: 0;
-      background: #FAFBFC;
-      border-top: 1px solid var(--border-light);
+      background: #FAFAFA;
+      border-top: 1px solid var(--gray-6);
     }
     .posts-panel.open { display: flex; }
 
@@ -437,8 +394,8 @@
       display: flex;
       flex-direction: column;
       gap: 3px;
-      padding: 12px 20px 12px 60px;
-      border-bottom: 1px solid var(--border-light);
+      padding: 12px 20px 12px 57px;
+      border-bottom: 1px solid var(--gray-6);
       text-decoration: none;
       transition: background 0.1s;
     }
@@ -448,128 +405,42 @@
     .post-title {
       font-size: 13px;
       font-weight: 600;
-      color: var(--text);
+      color: var(--black);
       line-height: 1.4;
-      display: -webkit-box;
-      -webkit-line-clamp: 1;
-      -webkit-box-orient: vertical;
+      white-space: nowrap;
       overflow: hidden;
+      text-overflow: ellipsis;
     }
     .post-desc {
       font-size: 11px;
-      color: var(--text-muted);
+      color: var(--gray-3);
       line-height: 1.4;
-      display: -webkit-box;
-      -webkit-line-clamp: 1;
-      -webkit-box-orient: vertical;
+      white-space: nowrap;
       overflow: hidden;
+      text-overflow: ellipsis;
     }
-    .post-meta {
-      font-size: 11px;
-      color: var(--text-placeholder);
-      margin-top: 1px;
-    }
-    .posts-loading {
-      padding: 14px 20px 14px 60px;
-      font-size: 12px;
-      color: var(--text-muted);
-    }
-    .chart-wrap {
-      padding: 24px 20px 16px;
-      height: 240px;
-    }
-    .period-tabs button { cursor: pointer; }
+    .post-meta { font-size: 11px; color: var(--gray-4); margin-top: 1px; }
+    .posts-msg { padding: 14px 20px 14px 57px; font-size: 12px; color: var(--gray-3); }
 
-    /* SIDEBAR */
-    .sidebar {
+    /* ── EMPTY STATE ── */
+    .empty-state {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-    }
-
-    /* TOP5 SIDEBAR CARD */
-    .top5-list {
-      padding: 4px 0;
-    }
-
-    .top5-item {
-      display: flex;
       align-items: center;
-      padding: 10px 20px;
-      gap: 12px;
-      border-bottom: 1px solid var(--border-light);
-      transition: background 0.1s;
+      justify-content: center;
+      padding: 56px 20px;
+      gap: 10px;
     }
-
-    .top5-item:last-child { border-bottom: none; }
-    .top5-item:hover { background: #FAFBFC; }
-
-    .top5-rank {
-      font-size: 18px;
-      font-weight: 900;
-      color: var(--green);
-      width: 24px;
-      text-align: center;
-      font-family: 'Roboto Mono', monospace;
-      flex-shrink: 0;
-    }
-
-    .top5-info { flex: 1; min-width: 0; }
-
-    .top5-keyword {
-      font-size: 14px;
+    .empty-icon { font-size: 28px; }
+    .empty-title {
+      font-size: 15px;
       font-weight: 700;
-      color: var(--text);
+      color: var(--gray-2);
+      letter-spacing: -0.3px;
     }
+    .empty-desc { font-size: 13px; color: var(--gray-3); }
 
-    .top5-meta {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .top5-change {
-      font-size: 13px;
-      font-weight: 700;
-      font-family: 'Roboto Mono', monospace;
-      flex-shrink: 0;
-    }
-
-    /* INFO CARD */
-    .info-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1px;
-      background: var(--border-light);
-    }
-
-    .info-cell {
-      background: var(--white);
-      padding: 16px;
-    }
-
-    .info-label {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-      font-weight: 500;
-    }
-
-    .info-val {
-      font-size: 20px;
-      font-weight: 800;
-      color: var(--text);
-      font-family: 'Roboto Mono', monospace;
-      letter-spacing: -0.5px;
-    }
-
-    .info-sub {
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-top: 3px;
-    }
-
-    /* LOADING / ERROR */
+    /* ── LOADING ── */
     .state-wrap {
       display: flex;
       flex-direction: column;
@@ -577,50 +448,135 @@
       justify-content: center;
       padding: 80px;
       gap: 12px;
-      color: var(--text-muted);
     }
-
     .loading-ring {
-      width: 28px;
-      height: 28px;
-      border: 2px solid var(--border);
-      border-top-color: var(--green);
+      width: 24px;
+      height: 24px;
+      border: 2px solid var(--gray-5);
+      border-top-color: var(--black);
       border-radius: 50%;
       animation: spin 0.7s linear infinite;
     }
+    .state-text { font-size: 13px; color: var(--gray-3); }
 
-    .state-text { font-size: 13px; color: var(--text-muted); }
+    /* ── SIDEBAR ── */
+    .sidebar { display: flex; flex-direction: column; gap: 16px; }
 
-    /* FOOTER */
+    /* TOP5 */
+    .top5-item {
+      display: flex;
+      align-items: center;
+      padding: 13px 20px;
+      gap: 14px;
+      border-top: 1px solid var(--gray-6);
+      transition: background 0.1s;
+    }
+    .top5-item:first-child { border-top: none; }
+    .top5-item:hover { background: var(--gray-6); }
+
+    .top5-rank {
+      font-size: 14px;
+      font-weight: 800;
+      color: var(--gray-4);
+      width: 20px;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .top5-rank.r1 { color: var(--black); font-size: 16px; }
+    .top5-rank.r2 { color: var(--gray-2); }
+    .top5-rank.r3 { color: var(--gray-3); }
+
+    .top5-info { flex: 1; min-width: 0; }
+    .top5-keyword {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--black);
+      letter-spacing: -0.2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .top5-meta { font-size: 11px; color: var(--gray-3); margin-top: 2px; }
+    .top5-rate {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--green);
+      font-variant-numeric: tabular-nums;
+      flex-shrink: 0;
+    }
+    .top5-rate.neg { color: var(--gray-4); }
+
+    /* RISING */
+    .rising-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 11px 20px;
+      border-top: 1px solid var(--gray-6);
+      transition: background 0.1s;
+    }
+    .rising-item:first-child { border-top: none; }
+    .rising-item:hover { background: var(--gray-6); }
+
+    .rising-left { display: flex; align-items: center; gap: 10px; }
+    .rising-num { font-size: 11px; font-weight: 700; color: var(--gray-4); width: 14px; }
+    .rising-kw { font-size: 13px; font-weight: 600; color: var(--black); }
+    .rising-rate { font-size: 12px; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; }
+
+    /* STATS GRID */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+    }
+    .stat-cell {
+      padding: 16px 20px;
+      border-top: 1px solid var(--gray-6);
+      border-right: 1px solid var(--gray-6);
+    }
+    .stat-cell:nth-child(even) { border-right: none; }
+    .stat-cell:nth-child(-n+2) { border-top: none; }
+
+    .stat-label { font-size: 11px; color: var(--gray-3); font-weight: 500; margin-bottom: 6px; }
+    .stat-val {
+      font-size: 20px;
+      font-weight: 800;
+      color: var(--black);
+      letter-spacing: -0.5px;
+      font-variant-numeric: tabular-nums;
+    }
+    .stat-val.green { color: var(--green); }
+    .stat-val.sm { font-size: 15px; }
+    .stat-sub { font-size: 11px; color: var(--gray-3); margin-top: 2px; }
+
+    /* ── FOOTER ── */
     footer {
-      max-width: 1200px;
+      max-width: 1160px;
       margin: 0 auto;
       padding: 20px 24px 40px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
-
-    .footer-left { font-size: 12px; color: var(--text-muted); }
-
+    .footer-left { font-size: 12px; color: var(--gray-4); }
     .footer-tags { display: flex; gap: 6px; }
-
     .footer-tag {
       font-size: 11px;
-      color: var(--text-muted);
+      color: var(--gray-3);
       background: var(--white);
       border: 1px solid var(--border);
-      padding: 3px 8px;
-      border-radius: 4px;
+      padding: 3px 9px;
+      border-radius: 20px;
     }
 
+    /* ── RESPONSIVE ── */
     @media (max-width: 900px) {
       .main-wrap { grid-template-columns: 1fr; }
       .sidebar { display: none; }
       .rank-table-header,
-      .rank-row { grid-template-columns: 40px 1fr 80px 72px; }
+      .rank-row { grid-template-columns: 40px 1fr 80px; }
       .rank-table-header span:last-child,
-      .rank-bar-cell { display: none; }
+      .rank-bar-wrap { display: none; }
     }
   </style>
 </head>
@@ -629,15 +585,15 @@
 <header>
   <div class="header-inner">
     <div class="logo">
-      <div class="logo-mark">📡</div>
+      <div class="logo-icon">📡</div>
       <span class="logo-name">블로그 트렌드 레이더</span>
-      <span class="logo-beta">BETA</span>
+      <span class="logo-badge">BETA</span>
     </div>
     <div class="header-right">
-      <span class="update-info">
-        <span class="live-dot"></span>
-        <span id="updateTime">데이터 로딩 중</span>
-      </span>
+      <div class="update-info">
+        <div class="live-dot"></div>
+        <span id="updateTime">로딩 중</span>
+      </div>
       <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
         <span id="refreshIcon">↻</span> 새로고침
       </button>
@@ -646,13 +602,13 @@
 </header>
 
 <div class="ticker-bar">
-  <div class="ticker-inner" id="tickerBar">
+  <div class="ticker-inner">
     <div class="ticker-item">
-      <span class="ticker-label">블로그 트렌드</span>
+      <span class="ticker-label">1위 키워드</span>
       <span class="ticker-val" id="tick-top1">—</span>
     </div>
     <div class="ticker-item">
-      <span class="ticker-label">급상승</span>
+      <span class="ticker-label">최고 상승률</span>
       <span class="ticker-val up" id="tick-rate">—</span>
     </div>
     <div class="ticker-item">
@@ -667,7 +623,6 @@
 </div>
 
 <div class="main-wrap">
-  <!-- LEFT: MAIN CONTENT -->
   <div id="mainContent">
     <div class="state-wrap">
       <div class="loading-ring"></div>
@@ -675,7 +630,6 @@
     </div>
   </div>
 
-  <!-- RIGHT: SIDEBAR -->
   <div class="sidebar" id="sidebar" style="display:none;">
     <div class="card">
       <div class="card-header">
@@ -684,43 +638,43 @@
           <div class="card-sub">실시간 인기 키워드</div>
         </div>
       </div>
-      <div class="top5-list" id="top5List"></div>
+      <div id="top5List"></div>
     </div>
 
     <div class="card">
       <div class="card-header">
         <div>
-          <div class="card-title">🔥 급상승</div>
-          <div class="card-sub">최근 3일 급상승 키워드</div>
+          <div class="card-title">급상승</div>
+          <div class="card-sub">최근 3일 기준</div>
         </div>
       </div>
-      <div id="risingList" style="padding:8px 0;"></div>
+      <div id="risingList" style="padding:4px 0;"></div>
     </div>
 
     <div class="card">
       <div class="card-header">
         <div class="card-title">현황</div>
       </div>
-      <div class="info-grid">
-        <div class="info-cell">
-          <div class="info-label">분석 키워드</div>
-          <div class="info-val" id="stat-count">—</div>
-          <div class="info-sub">개</div>
+      <div class="stats-grid">
+        <div class="stat-cell">
+          <div class="stat-label">분석 키워드</div>
+          <div class="stat-val" id="stat-count">—</div>
+          <div class="stat-sub">개</div>
         </div>
-        <div class="info-cell">
-          <div class="info-label">최고 상승률</div>
-          <div class="info-val up" id="stat-rate">—</div>
-          <div class="info-sub">%</div>
+        <div class="stat-cell">
+          <div class="stat-label">최고 상승률</div>
+          <div class="stat-val green" id="stat-rate">—</div>
+          <div class="stat-sub">%</div>
         </div>
-        <div class="info-cell">
-          <div class="info-label">1위 키워드</div>
-          <div class="info-val" id="stat-top" style="font-size:14px;">—</div>
-          <div class="info-sub">현재 1위</div>
+        <div class="stat-cell">
+          <div class="stat-label">1위 키워드</div>
+          <div class="stat-val sm" id="stat-top">—</div>
+          <div class="stat-sub">현재 1위</div>
         </div>
-        <div class="info-cell">
-          <div class="info-label">데이터 갱신</div>
-          <div class="info-val" style="font-size:13px;" id="stat-time">—</div>
-          <div class="info-sub">마지막 업데이트</div>
+        <div class="stat-cell">
+          <div class="stat-label">업데이트</div>
+          <div class="stat-val sm" id="stat-time">—</div>
+          <div class="stat-sub">마지막 갱신</div>
         </div>
       </div>
     </div>
@@ -728,16 +682,16 @@
 </div>
 
 <footer>
-  <div class="footer-left">Powered by Naver Blog Search · DataLab · HyperCLOVA X</div>
+  <div class="footer-left">Powered by Naver Blog API · DataLab · HyperCLOVA X</div>
   <div class="footer-tags">
-    <span class="footer-tag">NAVER API</span>
+    <span class="footer-tag">NAVER</span>
     <span class="footer-tag">HyperCLOVA X</span>
     <span class="footer-tag">Vercel</span>
   </div>
 </footer>
 
 <script>
-const CHART_COLORS = ['#03C75A','#1A73E8','#F5A623','#F04452','#9B59B6'];
+const CHART_COLORS = ['#111111','#03C75A','#888888','#BBBBBB','#E8E8E8'];
 let chartInstance = null;
 
 async function loadData() {
@@ -748,7 +702,11 @@ async function loadData() {
     renderAll(data);
   } catch(e) {
     document.getElementById('mainContent').innerHTML = `
-      <div class="state-wrap"><div class="state-text">데이터를 불러오지 못했습니다.</div></div>`;
+      <div class="card"><div class="state-wrap">
+        <div class="empty-icon">😶‍🌫️</div>
+        <div class="empty-title">데이터를 불러오지 못했어요</div>
+        <div class="empty-desc">잠시 후 다시 시도해 주세요</div>
+      </div></div>`;
   }
 }
 
@@ -772,74 +730,70 @@ function fmt(iso) {
   const d = new Date(iso);
   return d.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
-
 function fmtShort(iso) {
   const d = new Date(iso);
   return d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 }
 
-function changeText(rate) {
-  if (rate >= 100) return `<span class="up" style="font-weight:800;">🔥+${rate}%</span>`;
-  if (rate > 0) return `<span class="up">▲+${rate}%</span>`;
-  if (rate < -5) return `<span class="down">▼${Math.abs(rate)}%</span>`;
-  return `<span class="flat-color">보합</span>`;
+function rateTag(rate) {
+  if (rate >= 100) return `<span class="rank-rate up">+${rate}%</span>`;
+  if (rate > 0)    return `<span class="rank-rate up">+${rate}%</span>`;
+  if (rate < -5)   return `<span class="rank-rate down">${rate}%</span>`;
+  return `<span class="rank-rate flat">보합</span>`;
 }
 
 function renderAll(data) {
-  const kws = data.keywords;
-  const top5 = kws.slice(0, 5);
-  const maxScore = kws[0]?.score || 100;
-  const maxRate = Math.max(...kws.map(k => k.changeRate));
+  const kws = data.keywords || [];
+  const rising = data.rising || [];
+  const maxRate = Math.max(...kws.map(k => k.changeRate), 0);
+  const maxScore = kws[0]?.score || 1;
 
-  // Header
+  // Header / Ticker
   document.getElementById('updateTime').textContent = fmt(data.updatedAt) + ' 업데이트';
-
-  // Ticker
   document.getElementById('tick-top1').textContent = kws[0]?.keyword || '—';
   document.getElementById('tick-rate').textContent = maxRate > 0 ? `+${maxRate}%` : '—';
-  document.getElementById('tick-count').textContent = kws.length + '개';
+  document.getElementById('tick-count').textContent = kws.length ? kws.length + '개' : '—';
   document.getElementById('tick-time').textContent = fmtShort(data.updatedAt);
 
   // Sidebar stats
-  document.getElementById('stat-count').textContent = kws.length;
-  document.getElementById('stat-rate').textContent = maxRate;
+  document.getElementById('stat-count').textContent = kws.length || '—';
+  document.getElementById('stat-rate').textContent = maxRate || '—';
   document.getElementById('stat-top').textContent = kws[0]?.keyword || '—';
   document.getElementById('stat-time').textContent = fmtShort(data.updatedAt);
 
-  // Top5 sidebar
-  document.getElementById('top5List').innerHTML = top5.map((kw, i) => `
+  // TOP5
+  document.getElementById('top5List').innerHTML = kws.slice(0, 5).map((kw, i) => `
     <div class="top5-item">
-      <div class="top5-rank">${kw.rank}</div>
+      <div class="top5-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${kw.rank}</div>
       <div class="top5-info">
         <div class="top5-keyword">${kw.keyword}</div>
         <div class="top5-meta">${kw.comment || '트렌딩 키워드'}</div>
       </div>
-      <div class="top5-change" style="color:${CHART_COLORS[i]}">${kw.changeRate > 0 ? '+' : ''}${kw.changeRate}%</div>
+      <div class="top5-rate ${kw.changeRate <= 0 ? 'neg' : ''}">${kw.changeRate > 0 ? '+' : ''}${kw.changeRate}%</div>
     </div>
-  `).join('');
+  `).join('') || emptyHtml('키워드가 없어요');
 
-  // Rising list
-  const rising = data.rising || [];
+  // Rising
   document.getElementById('risingList').innerHTML = rising.slice(0, 5).map((kw, i) => `
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:9px 20px;border-bottom:1px solid var(--border-light);">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:11px;font-weight:700;color:var(--text-muted);min-width:16px;">${i+1}</span>
-        <span style="font-size:13px;font-weight:600;color:var(--text);">${kw.keyword}</span>
+    <div class="rising-item">
+      <div class="rising-left">
+        <span class="rising-num">${i+1}</span>
+        <span class="rising-kw">${kw.keyword}</span>
       </div>
-      <span style="font-size:12px;font-weight:700;color:var(--red);">▲${kw.risingRate}%</span>
+      <span class="rising-rate">▲${kw.risingRate}%</span>
     </div>
-  `).join('') || '<div style="padding:16px 20px;color:var(--text-muted);font-size:13px;">데이터 없음</div>';
+  `).join('') || `<div style="padding:16px 20px;font-size:13px;color:var(--gray-3);">데이터 없음</div>`;
 
   document.getElementById('sidebar').style.display = 'flex';
 
   // Main content
   document.getElementById('mainContent').innerHTML = `
-    <div style="display:flex; flex-direction:column; gap:16px;">
+    <div style="display:flex;flex-direction:column;gap:16px;">
       <div class="card">
         <div class="card-header">
           <div>
             <div class="card-title">트렌드 차트</div>
-            <div class="card-sub">TOP 5 키워드 상대적 검색량 변화 (각 키워드 기준 정규화)</div>
+            <div class="card-sub">TOP 5 키워드 상대 검색량 (키워드별 정규화)</div>
           </div>
           <div class="period-tabs">
             <button class="period-tab active">1주</button>
@@ -847,23 +801,19 @@ function renderAll(data) {
             <button class="period-tab">4주</button>
           </div>
         </div>
-        <div class="chart-wrap">
-          <canvas id="trendChart"></canvas>
-        </div>
+        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
       </div>
 
       <div class="card">
         <div class="card-header">
           <div>
             <div class="card-title">실시간 랭킹</div>
-            <div class="card-sub">네이버 블로그 트렌드 TOP 20</div>
+            <div class="card-sub">네이버 블로그 트렌드 TOP ${kws.length}</div>
           </div>
         </div>
         <div class="rank-table-header">
-          <span>순위</span>
-          <span>키워드</span>
-          <span style="text-align:right">주간 변화율</span>
-          <span style="text-align:right">포스팅 수</span>
+          <span>순위</span><span>키워드</span>
+          <span style="text-align:right">주간 변화</span>
           <span style="text-align:right">비중</span>
         </div>
         <div id="rankList"></div>
@@ -871,109 +821,116 @@ function renderAll(data) {
     </div>
   `;
 
-  // Render rank list
-  const logMax = Math.log10(Math.max(...kws.map(k => k.postCount), 10));
-  document.getElementById('rankList').innerHTML = kws.map((kw, i) => {
-    const isTop5 = kw.rank <= 5;
-    const colorIdx = Math.min(i, CHART_COLORS.length - 1);
-    const logPost = kw.postCount > 0 ? Math.log10(kw.postCount) : 0;
-    const scoreW = Math.round((logPost / logMax) * 100);
-    const numClass = kw.rank === 1 ? 'gold' : kw.rank === 2 ? 'silver' : kw.rank === 3 ? 'bronze' : '';
-    const trendBadge = kw.trend === '유행예감'
-      ? '<span class="trend-badge yebo">🔮 유행예감</span>'
-      : kw.trend === '유행중'
-      ? '<span class="trend-badge yujung">🔥 유행중</span>'
-      : '<span class="trend-badge yuji">📉 유행지남</span>';
-    const rowClass = kw.trend === '유행예감' ? 'yebo-row' : '';
+  // Rank rows
+  const top5 = kws.slice(0, 5);
+  const accentColors = ['#111111','#03C75A','#888888','#BBBBBB','#E0E0E0'];
 
-    return `
-      <div class="rank-item-wrap">
-        <div class="rank-row ${rowClass}" onclick="togglePosts(this, '${kw.keyword.replace(/'/g, "\'")}')">
-          <div class="rank-num ${numClass}">${kw.rank}</div>
-          <div class="rank-keyword">
-            ${isTop5 ? `<div class="color-bar" style="background:${CHART_COLORS[colorIdx]}"></div>` : '<div style="width:3px"></div>'}
-            <div style="min-width:0">
-              <div style="display:flex;align-items:center;gap:6px">
-                <span class="keyword-name">${kw.keyword}</span>
-                ${trendBadge}
+  document.getElementById('rankList').innerHTML = kws.length === 0
+    ? emptyHtml('트렌드 데이터가 없어요')
+    : kws.map((kw, i) => {
+        const numClass = i === 0 ? 'top1' : i === 1 ? 'top2' : i === 2 ? 'top3' : '';
+        const accentColor = i < 5 ? accentColors[i] : 'var(--gray-5)';
+        const scoreW = Math.round((kw.score / maxScore) * 100);
+        const isNew = kw.isNew;
+        const isHot = kw.risingRate >= 50;
+
+        return `
+          <div class="rank-item-wrap">
+            <div class="rank-row" onclick="togglePosts(this, '${kw.keyword.replace(/'/g,"\\'")}')">
+              <div class="rank-num ${numClass}">${kw.rank}</div>
+              <div class="rank-keyword">
+                <div class="rank-accent" style="background:${accentColor}"></div>
+                <div class="keyword-inner">
+                  <div class="keyword-name">${kw.keyword}</div>
+                  ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
+                  <div class="keyword-badges">
+                    ${isNew ? '<span class="badge badge-new">NEW</span>' : ''}
+                    ${isHot ? '<span class="badge badge-hot">HOT</span>' : ''}
+                    ${kw.trend === '유행예감' ? '<span class="badge badge-up">유행예감</span>' : ''}
+                    ${kw.trend === '유행지남' ? '<span class="badge badge-down">하락세</span>' : ''}
+                  </div>
+                </div>
               </div>
-              ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
+              <div>${rateTag(kw.changeRate)}</div>
+              <div class="rank-bar-wrap">
+                <div class="rank-bar-track">
+                  <div class="rank-bar-fill" style="width:${scoreW}%"></div>
+                </div>
+              </div>
+            </div>
+            <div class="posts-panel" id="posts-${i}">
+              <div class="posts-msg">불러오는 중...</div>
             </div>
           </div>
-          <div class="rank-score">${changeText(kw.changeRate)}</div>
-          <div class="rank-change" style="font-size:12px;color:var(--text-muted);">${kw.postCount > 0 ? kw.postCount.toLocaleString() : '-'}</div>
-          <div class="rank-bar-cell">
-            <div class="rank-bar-outer">
-              <div class="rank-bar-inner" style="width:${scoreW}%"></div>
-            </div>
-          </div>
-        </div>
-        <div class="posts-panel" id="posts-${i}">
-          <div class="posts-loading">불러오는 중...</div>
+        `;
+      }).join('');
+
+  // 20개 미만이면 하단에 안내 표시
+  if (kws.length > 0 && kws.length < 20) {
+    document.getElementById('rankList').insertAdjacentHTML('beforeend', `
+      <div class="rank-item-wrap">
+        <div style="padding:20px;text-align:center;">
+          <div style="font-size:13px;color:var(--gray-3);">더 이상 트렌드가 없어요</div>
+          <div style="font-size:11px;color:var(--gray-4);margin-top:4px;">데이터가 쌓이면 더 많은 키워드가 표시됩니다</div>
         </div>
       </div>
-    `;
-  }).join('');
+    `);
+  }
 
   drawChart(top5, 7);
   setupPeriodTabs(top5);
 }
 
-let currentOpenIdx = null;
+function emptyHtml(msg) {
+  return `<div class="empty-state">
+    <div class="empty-icon">🔍</div>
+    <div class="empty-title">${msg}</div>
+    <div class="empty-desc">잠시 후 다시 확인해 주세요</div>
+  </div>`;
+}
 
 async function togglePosts(row, keyword) {
-  const wrap = row.parentElement;
-  const panel = wrap.querySelector('.posts-panel');
+  const panel = row.parentElement.querySelector('.posts-panel');
   const isOpen = panel.classList.contains('open');
-
-  // 열려있는 패널 닫기
   document.querySelectorAll('.posts-panel.open').forEach(p => p.classList.remove('open'));
   document.querySelectorAll('.rank-row.active').forEach(r => r.classList.remove('active'));
-
   if (isOpen) return;
-
   panel.classList.add('open');
   row.classList.add('active');
-
-  // 이미 로딩된 경우 스킵
   if (panel.dataset.loaded) return;
-
   try {
     const res = await fetch('/api/posts?keyword=' + encodeURIComponent(keyword));
     const data = await res.json();
     const posts = data.posts || [];
-    if (!posts.length) {
-      panel.innerHTML = '<div class="posts-loading">관련 게시글이 없습니다.</div>';
-    } else {
-      panel.innerHTML = posts.map(p => `
-        <a class="post-item" href="${p.link}" target="_blank" rel="noopener">
-          <div class="post-title">${p.title}</div>
-          <div class="post-desc">${p.description}</div>
-          <div class="post-meta">${p.bloggerName} · ${p.postdate.slice(0,4)}.${p.postdate.slice(4,6)}.${p.postdate.slice(6,8)}</div>
-        </a>
-      `).join('');
-    }
+    panel.innerHTML = posts.length === 0
+      ? '<div class="posts-msg">관련 게시글이 없습니다.</div>'
+      : posts.map(p => `
+          <a class="post-item" href="${p.link}" target="_blank" rel="noopener">
+            <div class="post-title">${p.title}</div>
+            <div class="post-desc">${p.description}</div>
+            <div class="post-meta">${p.bloggerName} · ${p.postdate.slice(0,4)}.${p.postdate.slice(4,6)}.${p.postdate.slice(6,8)}</div>
+          </a>`).join('');
     panel.dataset.loaded = '1';
   } catch(e) {
-    panel.innerHTML = '<div class="posts-loading">불러오기 실패</div>';
+    panel.innerHTML = '<div class="posts-msg">불러오기 실패</div>';
   }
 }
 
 function setupPeriodTabs(top5) {
-  const tabs = document.querySelectorAll('.period-tab');
-  const periods = [7, 14, 28];
-  tabs.forEach((tab, i) => {
+  document.querySelectorAll('.period-tab').forEach((tab, i) => {
     tab.onclick = () => {
-      tabs.forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.period-tab').forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
-      drawChart(top5, periods[i]);
+      drawChart(top5, [7, 14, 28][i]);
     };
   });
 }
 
 function drawChart(top5, days = 7) {
   if (chartInstance) chartInstance.destroy();
-  const ctx = document.getElementById('trendChart').getContext('2d');
+  const ctx = document.getElementById('trendChart')?.getContext('2d');
+  if (!ctx) return;
+
   const labels = Array.from({length: days}, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (days - 1 - i));
@@ -981,23 +938,19 @@ function drawChart(top5, days = 7) {
   });
 
   const datasets = top5.map((kw, i) => {
-    const allVals = kw.values || [];
-    // 있는 데이터만 사용, 부족하면 앞을 0으로 패딩
-    const raw = allVals.length >= days
-      ? allVals.slice(-days)
-      : [...Array.from({length: days - allVals.length}, () => 0), ...allVals];
-    // 각 키워드를 0~100으로 정규화
-    const maxVal = Math.max(...raw, 1);
-    const minVal = Math.min(...raw);
-    const range = maxVal - minVal || 1;
-    const points = raw.map(v => Math.round(((v - minVal) / range) * 100));
+    const raw = (kw.values || []).length >= days
+      ? kw.values.slice(-days)
+      : [...Array(days - (kw.values||[]).length).fill(0), ...(kw.values||[])];
+    const maxV = Math.max(...raw, 1);
+    const minV = Math.min(...raw);
+    const range = maxV - minV || 1;
     return {
       label: kw.keyword,
-      data: points,
+      data: raw.map(v => Math.round(((v - minV) / range) * 100)),
       borderColor: CHART_COLORS[i],
-      backgroundColor: CHART_COLORS[i] + '18',
-      borderWidth: 2,
-      pointRadius: 3,
+      backgroundColor: CHART_COLORS[i] + '12',
+      borderWidth: i === 0 ? 2.5 : 1.5,
+      pointRadius: i === 0 ? 3 : 2,
       pointHoverRadius: 5,
       tension: 0.4,
       fill: false,
@@ -1015,36 +968,38 @@ function drawChart(top5, days = 7) {
         legend: {
           position: 'bottom',
           labels: {
-            color: '#8B95A1',
-            font: { size: 11, family: 'Noto Sans KR' },
+            color: '#888888',
+            font: { size: 11, family: 'Pretendard' },
             boxWidth: 10,
             padding: 14,
           }
         },
         tooltip: {
           backgroundColor: '#fff',
-          borderColor: '#E5E8ED',
+          borderColor: '#EBEBEB',
           borderWidth: 1,
-          titleColor: '#191F28',
-          bodyColor: '#4E5968',
-          titleFont: { family: 'Noto Sans KR', size: 12, weight: '700' },
-          bodyFont: { family: 'Roboto Mono', size: 11 },
+          titleColor: '#111111',
+          bodyColor: '#555555',
+          titleFont: { family: 'Pretendard', size: 12, weight: '700' },
+          bodyFont: { family: 'Pretendard', size: 11 },
           padding: 10,
-          boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
         }
       },
       scales: {
         x: {
-          grid: { color: '#F0F2F5' },
-          ticks: { color: '#B0B8C1', font: { size: 11, family: 'Roboto Mono' } },
-          border: { color: '#E5E8ED' },
+          grid: { color: '#F5F5F5' },
+          ticks: { color: '#BBBBBB', font: { size: 11, family: 'Pretendard' } },
+          border: { color: '#EBEBEB' },
         },
         y: {
-          min: 0,
-          max: 100,
-          grid: { color: '#F0F2F5' },
-          ticks: { color: '#B0B8C1', font: { size: 11, family: 'Roboto Mono' }, callback: v => v + '%' },
-          border: { color: '#E5E8ED' },
+          min: 0, max: 100,
+          grid: { color: '#F5F5F5' },
+          ticks: {
+            color: '#BBBBBB',
+            font: { size: 11, family: 'Pretendard' },
+            callback: v => v + '%'
+          },
+          border: { color: '#EBEBEB' },
         }
       }
     }
