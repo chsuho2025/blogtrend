@@ -61,9 +61,21 @@ async function collectBlogTitles() {
       console.log(`[collectBlogTitles] 실패: ${keyword}`, e.message);
     }
   }
+  // 광고/지역 블로그 필터링
+  const NOISE_PATTERNS = [
+    /\d{2,3}[-\s]?\d{3,4}[-\s]?\d{4}/, // 전화번호
+    /(구|동|읍|면|리)\s*(맛집|미용실|헬스|학원|병원|치과|부동산|공인중개|임대|분양|공장|창고|세탁|네일|피부|한의원|안과|정형외과|노무사|변호사|회계사)/, // 지역+업종
+    /(원룸|투룸|오피스텔|상가|사무실)\s*(임대|분양|매매)/, // 부동산
+    /\d+평\s*(임대|분양|매매)/, // 부동산 평수
+  ];
+
+  const filtered = allTitles.filter(title => {
+    return !NOISE_PATTERNS.some(pattern => pattern.test(title));
+  });
+
   // 중복 제거
-  const unique = [...new Set(allTitles)];
-  console.log(`[collectBlogTitles] 총 ${unique.length}개 수집 (중복제거 전: ${allTitles.length}개)`);
+  const unique = [...new Set(filtered)];
+  console.log(`[collectBlogTitles] 총 ${unique.length}개 수집 (원본: ${allTitles.length}개, 필터후: ${filtered.length}개)`);
   return unique;
 }
 
@@ -169,6 +181,11 @@ async function bloggerPick(keywords) {
 - 너무 광범위하지 않고 구체적인 것
 - 지금 막 뜨기 시작한 느낌
 
+절대 금지:
+- 목록에 없는 키워드를 새로 만들거나 변형하지 마
+- 목록에 있는 키워드를 그대로만 골라줘
+- 지역명+업종 조합은 선택하지 마
+
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
               },
@@ -203,15 +220,21 @@ async function bloggerPick(keywords) {
 // Step 5: 픽된 키워드 빈도 재검증
 // ─────────────────────────────────────────
 function verifyFrequency(pickedKeywords, titles) {
+  // 공백 제거 버전으로 비교 (상하이버터떡 vs 상하이 버터떡 동일 취급)
+  const normalizeStr = s => s.replace(/\s+/g, '').toLowerCase();
+  const normalizedTitles = titles.map(normalizeStr);
+
   const verified = [];
   for (const kw of pickedKeywords) {
-    const count = titles.filter(t => t.includes(kw)).length;
+    const normKw = normalizeStr(kw);
+    const count = normalizedTitles.filter(t => t.includes(normKw)).length;
     verified.push({ keyword: kw, titleCount: count });
   }
   // 제목에 1번이라도 나온 것만 유지
   const filtered = verified.filter(k => k.titleCount >= 1);
   filtered.sort((a, b) => b.titleCount - a.titleCount);
   console.log(`[verifyFrequency] ${pickedKeywords.length}개 → 검증 후 ${filtered.length}개`);
+  console.log('[verifyFrequency] 생존:', filtered.map(k => `${k.keyword}(${k.titleCount})`));
   return filtered.map(k => k.keyword);
 }
 
