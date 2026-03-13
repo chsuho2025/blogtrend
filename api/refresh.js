@@ -84,22 +84,19 @@ async function extractTrendKeywords(titles) {
             messages: [
               {
                 role: 'system',
-                content: `너는 네이버 블로그 트렌드 분석가야.
+                content: `너는 네이버 블로그 키워드 수집가야.
 아래는 최근 네이버 블로그 제목 목록이야.
-이 제목들에서 "지금 이 키워드로 블로그를 쓰면 검색이 될 것 같다"고 판단되는 트렌드 키워드 15개를 뽑아줘.
+이 제목들에서 사람들이 검색할 만한 키워드를 최대한 많이 뽑아줘. 20개까지 가능.
 
-트렌드 키워드란:
-- 요즘 특별히 주목받는 구체적인 제품명, 음식명, 챌린지명 (예: 황치즈칩, 갓생루틴, 무지출챌린지)
-- 지금 이 시점에 유독 많이 검색되는 고유한 무언가
-- 막연한 카테고리가 아니라, 그 안의 특정 아이템
+뽑는 기준:
+- 제품명, 음식명, 브랜드명, 챌린지명, 트렌드어 등 뭐든 OK
+- 구체적인 것일수록 좋아 (예: 황치즈칩, 갓생루틴, 갤럭시 S26)
+- 애매해도 일단 뽑아줘
 
-트렌드 키워드가 아닌 것:
-- 언제나 검색되는 카테고리 단어 (예: 운동, 요리, 패션, 여행, 뷰티 — 단, "갓생 루틴"처럼 트렌드어와 결합하면 가능)
-- 막연한 수식어 (예: 추천, 후기, 꿀팁, 신상, 할인)
-- 지역명 단독 또는 지역+업종 조합
-- 날짜, 연도
-- 사람 이름, 사건사고, 뉴스성 단어
-- 제목을 그대로 복붙한 긴 문장
+제외할 것 (이것만):
+- 연도, 날짜 단독 (예: 2026, 3월)
+- 한자어 단독 (예: 壬寅, 甲辰)
+- 제목을 그대로 복붙한 30자 이상 문장
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
@@ -144,128 +141,8 @@ async function extractTrendKeywords(titles) {
 }
 
 // ─────────────────────────────────────────
-// Step 3: filterKeywords — HCX-007 최종 검증
+// Step 3: 키워드 풀 누적 (진입일 기록)
 // ─────────────────────────────────────────
-async function filterKeywords(keywords) {
-  const kwList = keywords.map((k, i) => `${i}:${k}`).join('\n');
-  try {
-    const res = await fetch(
-      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: `아래는 네이버 블로그 제목에서 추출한 키워드 후보야.
-이 중에서 "지금 네이버 블로그 창작자가 포스팅 주제로 쓸 만한 트렌드 키워드"의 번호만 골라줘.
-
-통과 기준:
-- 요즘 특별히 주목받는 구체적인 제품명, 음식명, 챌린지명 (예: 황치즈칩, 콘치즈 불닭볶음면)
-- 브랜드+제품 조합 (예: 갤럭시 S26, 오뚜기 진밀면)
-- 트렌드어+행동 조합 (예: 갓생루틴, 무지출챌린지)
-- 전국적으로 누구나 검색할 만한 것
-
-제거 기준:
-- 사건사고, 범죄, 의료, 법률 관련 (예: 성매매, 합의금, 방광염, 변호사)
-- 레시피 문장 그대로 (예: 가지 싫어맨도 반한 어향가지덮밥 레시피, 집에서 간단하게 만드는 완벽한 간장치킨)
-- 특정 지역+가게명 조합 (예: 천호 맛집 쭈꾸미도사, 합정역 맛집 라라와케이)
-- 특정 지역 매장명 (예: 이마트 트레이더스 서면점)
-- 광고성 문구 (예: 전국 수천 업장이 선택한)
-- 의미 불명확한 문장 (예: 알고먹어야 맛,건강)
-- 가격 정보 단독, 상품 코드, 모델 번호
-- 30자 이상 긴 문장
-
-반드시 JSON 배열로만: [통과할번호, ...]
-다른 설명 없이 JSON만.`,
-            },
-            { role: 'user', content: kwList },
-          ],
-          maxCompletionTokens: 500,
-          temperature: 0.1,
-          repetitionPenalty: 1.0,
-          thinking: { effort: 'none' },
-        }),
-      }
-    );
-    const data = await res.json();
-    const text = data.result?.message?.content || '[]';
-    const passIndices = new Set(JSON.parse(text.replace(/```json|```/g, '').trim()));
-    const filtered = keywords.filter((_, i) => passIndices.has(i));
-    console.log(`[filterKeywords] ${keywords.length}개 → ${filtered.length}개`);
-    console.log('[filterKeywords] 통과:', filtered);
-    return filtered;
-  } catch (e) {
-    console.log('[filterKeywords] 실패, 원본 유지:', e.message);
-    return keywords;
-  }
-}
-
-// ─────────────────────────────────────────
-// Step 4: 키워드 풀 누적 (진입일 기록 + 자가정화)
-// ─────────────────────────────────────────
-async function cleanPool(pool) {
-  if (pool.length === 0) return pool;
-  const kwList = pool.map((item, i) => `${i}:${item.keyword}`).join('\n');
-  try {
-    const res = await fetch(
-      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: `아래는 네이버 블로그 트렌드 키워드 풀이야.
-이 중에서 "트렌드 키워드로서 가치 없는 것"의 번호만 골라줘.
-
-제거 대상:
-- 운동, 요리, 패션처럼 언제나 검색되는 카테고리 단어
-- 추천, 후기, 꿀팁, 신상, 할인처럼 수식어 단독
-- 지역명 단독 또는 지역+업종 조합
-- 사람 이름, 사건사고, 뉴스성 단어
-- 의류 카테고리 단독 (티셔츠, 블라우스, 스카프 등)
-
-유지 대상:
-- 구체적인 제품명, 음식명 (황치즈칩, 버터떡 등)
-- 트렌드어+행동 조합 (갓생루틴, 무지출챌린지 등)
-- 브랜드+제품 조합 (갤럭시 S26 울트라 등)
-
-반드시 JSON 배열로만: [제거할번호, ...]
-제거할 것이 없으면 []
-다른 설명 없이 JSON만.`,
-            },
-            { role: 'user', content: kwList },
-          ],
-          maxCompletionTokens: 500,
-          temperature: 0.1,
-          repetitionPenalty: 1.0,
-          thinking: { effort: 'none' },
-        }),
-      }
-    );
-    const data = await res.json();
-    const text = data.result?.message?.content || '[]';
-    const removeIndices = new Set(JSON.parse(text.replace(/```json|```/g, '').trim()));
-    const cleaned = pool.filter((_, i) => !removeIndices.has(i));
-    console.log(`[cleanPool] ${pool.length}개 → ${cleaned.length}개 (${pool.length - cleaned.length}개 제거)`);
-    return cleaned;
-  } catch (e) {
-    console.log('[cleanPool] 실패, 원본 유지:', e.message);
-    return pool;
-  }
-}
-
 async function updateKeywordPool(newKeywords) {
   let rawPool = [];
   try {
@@ -284,23 +161,20 @@ async function updateKeywordPool(newKeywords) {
     typeof item === 'string' ? { keyword: item, addedAt: '2026-01-01' } : item
   );
 
-  // 자가정화
-  const cleanedPool = await cleanPool(pool);
-
   // 신규 키워드 추가
-  const existingNorms = new Set(cleanedPool.map(item => norm(item.keyword)));
+  const existingNorms = new Set(pool.map(item => norm(item.keyword)));
   const newEntries = newKeywords
     .filter(kw => !existingNorms.has(norm(kw)))
     .map(kw => ({ keyword: kw, addedAt: today }));
 
-  const merged = [...newEntries, ...cleanedPool].slice(0, 100);
+  const merged = [...newEntries, ...pool].slice(0, 100);
   await redis.set('keyword_pool', JSON.stringify(merged));
   console.log(`[updateKeywordPool] pool 크기: ${merged.length} (신규: ${newEntries.length}개)`);
   return merged;
 }
 
 // ─────────────────────────────────────────
-// Step 5: DataLab 검색량 조회
+// Step 4: DataLab 검색량 조회
 // ─────────────────────────────────────────
 async function getSearchTrends(keywords) {
   const results = [];
@@ -343,7 +217,7 @@ async function getSearchTrends(keywords) {
 }
 
 // ─────────────────────────────────────────
-// Step 6: 포스팅 수 조회
+// Step 5: 포스팅 수 조회
 // ─────────────────────────────────────────
 async function getBlogPostCount(keywords) {
   const results = [];
@@ -368,7 +242,7 @@ async function getBlogPostCount(keywords) {
 }
 
 // ─────────────────────────────────────────
-// Step 7: 키워드 정제 (사용자 노출용 표기 정규화)
+// Step 6: 키워드 정제 (사용자 노출용 표기 정규화)
 // ─────────────────────────────────────────
 async function polishKeywords(keywords) {
   const kwList = keywords.map((k, i) => `${i}:${k}`).join('\n');
@@ -419,7 +293,7 @@ async function polishKeywords(keywords) {
 }
 
 // ─────────────────────────────────────────
-// Step 8: 코멘트 생성
+// Step 7: 코멘트 생성
 // ─────────────────────────────────────────
 async function generateComments(topKeywords) {
   const kwList = topKeywords.map((k, i) => `${i}:${k.keyword}`).join(', ');
@@ -503,9 +377,7 @@ module.exports = async (req, res) => {
     const refined = await extractTrendKeywords(allTitles);
     if (!refined.length) throw new Error('키워드 추출 실패');
 
-    const verified = await filterKeywords(refined);
-
-    const keywordPool = await updateKeywordPool(verified);
+    const keywordPool = await updateKeywordPool(refined);
     if (!keywordPool.length) throw new Error('키워드 풀 없음');
 
     const queryKeywords = keywordPool.slice(0, 40).map(item => item.keyword);
@@ -621,7 +493,6 @@ module.exports = async (req, res) => {
       updatedAt: result.updatedAt,
       poolSize: keywordPool.length,
       titlesCollected: allTitles.length,
-      verified: verified.length,
     });
   } catch (err) {
     console.error(err);
