@@ -31,7 +31,7 @@ async function collectBlogTitles() {
     /(?:서울|부산|인천|대구|광주|대전|울산|수원|성남|고양|용인|창원|청주|전주|천안|안산|안양|남양주|화성|평택|의정부|시흥|파주|김포|광명|광주시|하남|양주|구리|오산|군포|의왕|포천|동두천|가평|여주|이천|안성|양평)[가-힣\s]{1,10}(?:맛집|카페|헬스|병원|학원|부동산|공인중개|인테리어|치과|피부과|한의원|미용실|네일|네일샵|분양|아파트|오피스텔)/,
   ];
 
-  for (const keyword of NET_KEYWORDS) {
+  await Promise.all(NET_KEYWORDS.map(async (keyword) => {
     try {
       const url = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=50&sort=date`;
       const res = await fetch(url, {
@@ -54,7 +54,7 @@ async function collectBlogTitles() {
     } catch (e) {
       console.log(`[collectBlogTitles] ${keyword} 오류:`, e.message);
     }
-  }
+  }));
 
   const filtered = allTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
   console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (API응답: ${rawCount}개, 중복제거: ${allTitles.length}개, 노이즈제거: ${filtered.length}개)`);
@@ -68,8 +68,12 @@ async function extractTrendKeywords(titles) {
   const CHUNK_SIZE = 400;
   const allKeywords = [];
 
+  const chunks = [];
   for (let i = 0; i < Math.min(titles.length, 1600); i += CHUNK_SIZE) {
-    const chunk = titles.slice(i, i + CHUNK_SIZE);
+    chunks.push({ index: chunks.length + 1, titles: titles.slice(i, i + CHUNK_SIZE) });
+  }
+
+  const chunkResults = await Promise.all(chunks.map(async ({ index, titles: chunk }) => {
     try {
       const res = await fetch(
         'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
@@ -116,12 +120,15 @@ async function extractTrendKeywords(titles) {
       const data = await res.json();
       const text = data.result?.message?.content || '[]';
       const keywords = JSON.parse(text.replace(/```json|```/g, '').trim());
-      console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1}: ${keywords.length}개 →`, keywords);
-      allKeywords.push(...keywords);
+      console.log(`[extractTrendKeywords] chunk${index}: ${keywords.length}개 →`, keywords);
+      return keywords;
     } catch (e) {
-      console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1} 실패:`, e.message);
+      console.log(`[extractTrendKeywords] chunk${index} 실패:`, e.message);
+      return [];
     }
-  }
+  }));
+
+  allKeywords.push(...chunkResults.flat());
 
   // 코드 필터: 타입, 최소 길이, 특수문자, 띄어쓰기 중복
   const norm = s => s.replace(/\s+/g, '').toLowerCase();
@@ -177,9 +184,12 @@ async function updateKeywordPool(newKeywords) {
 // Step 4: DataLab 검색량 조회
 // ─────────────────────────────────────────
 async function getSearchTrends(keywords) {
-  const results = [];
+  const chunks = [];
   for (let i = 0; i < keywords.length; i += 5) {
-    const chunk = keywords.slice(i, i + 5);
+    chunks.push(keywords.slice(i, i + 5));
+  }
+
+  const chunkResults = await Promise.all(chunks.map(async (chunk, ci) => {
     const keywordGroups = chunk.map(kw => ({ groupName: kw, keywords: [kw] }));
     try {
       const res = await fetch('https://openapi.naver.com/v1/datalab/search', {
@@ -198,7 +208,7 @@ async function getSearchTrends(keywords) {
       });
       const data = await res.json();
       if (data.results) {
-        for (const result of data.results) {
+        return data.results.map(result => {
           const values = result.data.map(d => d.ratio);
           const recent7 = values.slice(-7);
           const prev7 = values.slice(-14, -7);
@@ -206,22 +216,23 @@ async function getSearchTrends(keywords) {
           const recent3 = values.slice(-3);
           const prev3 = values.slice(-6, -3);
           const risingRate = avg(prev3) > 0 ? ((avg(recent3) - avg(prev3)) / avg(prev3)) * 100 : 0;
-          results.push({ keyword: result.title, weeklyRate, risingRate, values });
-        }
+          return { keyword: result.title, weeklyRate, risingRate, values };
+        });
       }
     } catch (e) {
-      console.log('[getSearchTrends] chunk 오류', i, e.message);
+      console.log('[getSearchTrends] chunk 오류', ci, e.message);
     }
-  }
-  return results;
+    return [];
+  }));
+
+  return chunkResults.flat();
 }
 
 // ─────────────────────────────────────────
 // Step 5: 포스팅 수 조회
 // ─────────────────────────────────────────
 async function getBlogPostCount(keywords) {
-  const results = [];
-  for (const kw of keywords) {
+  return Promise.all(keywords.map(async (kw) => {
     try {
       const res = await fetch(
         `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(kw)}&display=1`,
@@ -233,12 +244,11 @@ async function getBlogPostCount(keywords) {
         }
       );
       const data = await res.json();
-      results.push({ keyword: kw, total: data.total > 0 ? data.total : 1000 });
+      return { keyword: kw, total: data.total > 0 ? data.total : 1000 };
     } catch {
-      results.push({ keyword: kw, total: 1000 });
+      return { keyword: kw, total: 1000 };
     }
-  }
-  return results;
+  }));
 }
 
 // ─────────────────────────────────────────
