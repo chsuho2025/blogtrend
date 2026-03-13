@@ -99,20 +99,21 @@ async function extractTrendKeywords(titles) {
                 role: 'system',
                 content: `너는 네이버 블로그 트렌드 분석가야.
 아래는 최근 네이버 블로그 제목 목록이야.
-이 제목들에서 "지금 이 키워드로 블로그를 쓰면 검색이 될 것 같다"고 판단되는 트렌드 키워드 15개를 뽑아줘.
+이 제목들에서 "네이버 검색창에 직접 치는 사람이 많을 것 같은 트렌드 키워드" 15개를 뽑아줘.
 
-트렌드 키워드란:
-- 요즘 특별히 주목받는 구체적인 제품명, 음식명, 챌린지명 (예: 황치즈칩, 갓생루틴, 무지출챌린지)
-- 지금 이 시점에 유독 많이 검색되는 고유한 무언가
-- 막연한 카테고리가 아니라, 그 안의 특정 아이템
+좋은 키워드 기준:
+- 네이버 검색량이 실제로 있을 법한 일반명사 수준 (예: 황치즈칩, 상하이버터떡, 무지출챌린지, 갓생루틴, 자라 봄신상)
+- 제품명/음식명/챌린지명은 브랜드+제품 조합까지는 OK (예: 스타벅스 봄신상, 자라 트렌치코트)
+- 요즘 특별히 뜨는 것
 
-트렌드 키워드가 아닌 것:
-- 언제나 검색되는 카테고리 단어 (예: 운동, 요리, 패션, 여행, 뷰티, 맛집, 추천, 후기)
-- 막연한 수식어 (예: 꿀팁, 신상, 할인, 솔직, 내돈내산)
-- 지역명 단독 또는 지역+업종 조합
+제외할 것:
+- 특정 가게 상호명, 지점명 (예: 비오른헤어 클리닉, 한성양꼬치 선릉1호점)
+- 특정인 관련 1회성 이벤트 (예: 켈리 손윤희 본식 가봉)
+- 지역+업종 조합 (예: 수원 하수구막힘, 대구 전당포)
+- 모델명/시리얼넘버 포함 (예: LG 냉장고 M873GCB452)
+- 언제나 검색되는 범용 단어 (예: 맛집, 추천, 후기, 꿀팁, 다이어트)
 - 날짜, 연도 단독
-- 사람 이름, 사건사고, 뉴스성 단어
-- 30자 이상 긴 문장
+- 15자 이상 긴 문장
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
@@ -183,7 +184,14 @@ async function updateKeywordPool(newKeywords) {
     .filter(kw => !existingNorms.has(norm(kw)))
     .map(kw => ({ keyword: kw, addedAt: today }));
 
-  const merged = [...newEntries, ...pool].slice(0, 100);
+  // 14일 지난 키워드 제거
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - 14);
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  const poolFiltered = pool.filter(item => (item.addedAt || '2026-01-01') >= cutoffStr);
+  console.log(`[updateKeywordPool] 14일 초과 제거: ${pool.length}개 → ${poolFiltered.length}개`);
+
+  const merged = [...newEntries, ...poolFiltered].slice(0, 100);
   await redis.set('keyword_pool', JSON.stringify(merged));
   console.log(`[updateKeywordPool] pool 크기: ${merged.length} (신규: ${newEntries.length}개)`);
   return merged;
@@ -398,9 +406,6 @@ function daysDiff(dateStr) {
 // ─────────────────────────────────────────
 module.exports = async (req, res) => {
   try {
-    await redis.del('keyword_pool');
-    console.log('[init] keyword_pool 초기화 완료');
-
     const allTitles = await collectBlogTitles();
     if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
