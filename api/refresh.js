@@ -70,7 +70,7 @@ async function collectBlogTitles() {
 // Step 2: HyperCLOVA X 키워드 추출
 // ─────────────────────────────────────────
 async function extractTrendKeywords(titles) {
-  const CHUNK_SIZE = 400;
+  const CHUNK_SIZE = 200;
   const allKeywords = [];
 
   const chunks = [];
