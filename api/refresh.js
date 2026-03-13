@@ -92,7 +92,7 @@ async function extractTrendKeywords(titles) {
     const titleText = chunk.join('\n');
     try {
       const res = await fetch(
-        'https://clovastudio.stream.ntruss.com/testapp/v3/chat-completions/HCX-DASH-002',
+        'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
         {
           method: 'POST',
           headers: {
@@ -129,7 +129,7 @@ async function extractTrendKeywords(titles) {
                 content: titleText,
               },
             ],
-            maxTokens: 300,
+            maxCompletionTokens: 300,
             temperature: 0.3,
             repetitionPenalty: 1.1,
           }),
@@ -162,7 +162,7 @@ async function bloggerPick(keywords) {
   for (const [blogger, role] of Object.entries(BLOGGERS)) {
     try {
       const res = await fetch(
-        'https://clovastudio.stream.ntruss.com/testapp/v3/chat-completions/HCX-DASH-002',
+        'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
         {
           method: 'POST',
           headers: {
@@ -194,7 +194,7 @@ async function bloggerPick(keywords) {
                 content: kwList,
               },
             ],
-            maxTokens: 200,
+            maxCompletionTokens: 200,
             temperature: 0.5,
             repetitionPenalty: 1.1,
           }),
@@ -340,7 +340,7 @@ async function generateComments(topKeywords) {
   const kwList = topKeywords.map((k, i) => `${i}:${k.keyword}`).join(', ');
   try {
     const res = await fetch(
-      'https://clovastudio.stream.ntruss.com/testapp/v3/chat-completions/HCX-DASH-002',
+      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
       {
         method: 'POST',
         headers: {
@@ -355,7 +355,7 @@ async function generateComments(topKeywords) {
             },
             { role: 'user', content: kwList },
           ],
-          maxTokens: 400,
+          maxCompletionTokens: 400,
           temperature: 0.5,
           repetitionPenalty: 1.1,
         }),
