@@ -21,8 +21,10 @@ const NET_KEYWORDS = [
 // Step 1: 그물 키워드로 블로그 제목 수집
 // ─────────────────────────────────────────
 async function collectBlogTitles() {
-  const allTitles = [];
   const seenTitles = new Set();
+  const allTitles = [];
+  let rawCount = 0;
+
   const NOISE_PATTERNS = [
     /\d{2,4}-\d{3,4}-\d{4}/,
     /010[-.]?\d{4}[-.]?\d{4}/,
@@ -40,6 +42,7 @@ async function collectBlogTitles() {
       });
       const data = await res.json();
       if (data.items) {
+        rawCount += data.items.length;
         for (const item of data.items) {
           const title = item.title.replace(/<[^>]+>/g, '').trim();
           if (!seenTitles.has(title)) {
@@ -53,9 +56,8 @@ async function collectBlogTitles() {
     }
   }
 
-  const originalCount = allTitles.length;
   const filtered = allTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
-  console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (원본: ${originalCount}개, 필터후: ${filtered.length}개)`);
+  console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (API응답: ${rawCount}개, 중복제거: ${allTitles.length}개, 노이즈제거: ${filtered.length}개)`);
   return filtered;
 }
 
@@ -68,7 +70,6 @@ async function extractTrendKeywords(titles) {
 
   for (let i = 0; i < Math.min(titles.length, 1600); i += CHUNK_SIZE) {
     const chunk = titles.slice(i, i + CHUNK_SIZE);
-    const titleText = chunk.join('\n');
     try {
       const res = await fetch(
         'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
@@ -98,14 +99,14 @@ async function extractTrendKeywords(titles) {
 - 지역명 단독 또는 지역+업종 조합
 - 날짜, 연도
 - 사람 이름, 사건사고, 뉴스성 단어
-- 20자 초과 (제목을 그대로 복붙하지 마)
+- 제목을 그대로 복붙한 긴 문장
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
               },
               {
                 role: 'user',
-                content: titleText,
+                content: chunk.join('\n'),
               },
             ],
             maxCompletionTokens: 1000,
@@ -117,8 +118,7 @@ async function extractTrendKeywords(titles) {
       );
       const data = await res.json();
       const text = data.result?.message?.content || '[]';
-      const cleaned = text.replace(/```json|```/g, '').trim();
-      const keywords = JSON.parse(cleaned);
+      const keywords = JSON.parse(text.replace(/```json|```/g, '').trim());
       console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1}: ${keywords.length}개 →`, keywords);
       allKeywords.push(...keywords);
     } catch (e) {
@@ -126,16 +126,15 @@ async function extractTrendKeywords(titles) {
     }
   }
 
-  // 코드 기반 필터: 길이, 블랙리스트, 특수문자
+  // 코드 필터: 타입, 최소 길이, 특수문자, 띄어쓰기 중복
   const norm = s => s.replace(/\s+/g, '').toLowerCase();
   const seenNorm = new Set();
   const filtered = allKeywords.filter(kw => {
     if (typeof kw !== 'string') return false;
-    if (kw.length > 20) return false;                          // 너무 긴 것 (제목 복붙)
-    if (kw.length < 2) return false;                           // 너무 짧은 것
-    if (/[\[\]【】()（）<>《》]/.test(kw)) return false;       // 특수문자 포함
+    if (kw.length < 2) return false;
+    if (/[\[\]【】()（）<>《》]/.test(kw)) return false;
     const n = norm(kw);
-    if (seenNorm.has(n)) return false;                         // 띄어쓰기 중복
+    if (seenNorm.has(n)) return false;
     seenNorm.add(n);
     return true;
   });
@@ -150,16 +149,15 @@ async function extractTrendKeywords(titles) {
 function verifyFrequency(keywords, titles) {
   const norm = s => s.replace(/\s+/g, '').toLowerCase();
   const normalizedTitles = titles.map(norm);
-
-  const verified = [];
   const seenNorm = new Set();
+  const verified = [];
 
   for (const kw of keywords) {
     const n = norm(kw);
     if (seenNorm.has(n)) continue;
     seenNorm.add(n);
     const count = normalizedTitles.filter(t => t.includes(n)).length;
-    if (count >= 2) verified.push({ keyword: kw, titleCount: count });
+    if (count >= 1) verified.push({ keyword: kw, titleCount: count });
   }
 
   verified.sort((a, b) => b.titleCount - a.titleCount);
@@ -173,7 +171,7 @@ function verifyFrequency(keywords, titles) {
 // ─────────────────────────────────────────
 async function cleanPool(pool) {
   if (pool.length === 0) return pool;
-  const kwList = pool.map((item, i) => `${i}:${typeof item === 'string' ? item : item.keyword}`).join('\n');
+  const kwList = pool.map((item, i) => `${i}:${item.keyword}`).join('\n');
   try {
     const res = await fetch(
       'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
@@ -229,13 +227,11 @@ async function cleanPool(pool) {
 }
 
 async function updateKeywordPool(newKeywords) {
-  let pool = [];
+  let rawPool = [];
   try {
     const stored = await redis.get('keyword_pool');
-    if (stored && stored !== null) {
-      pool = typeof stored === 'string' ? JSON.parse(stored) : stored;
-    }
-    console.log('[updateKeywordPool] 기존 pool 크기:', pool.length);
+    if (stored) rawPool = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    console.log('[updateKeywordPool] 기존 pool 크기:', rawPool.length);
   } catch (e) {
     console.log('[updateKeywordPool] pool 로드 실패:', e.message);
   }
@@ -243,23 +239,21 @@ async function updateKeywordPool(newKeywords) {
   const today = getDateString(0);
   const norm = s => s.replace(/\s+/g, '').toLowerCase();
 
-  // 하위 호환: string이면 변환
-  const poolNormalized = pool.map(item =>
+  // 모두 { keyword, addedAt } 형태로 정규화
+  const pool = rawPool.map(item =>
     typeof item === 'string' ? { keyword: item, addedAt: '2026-01-01' } : item
   );
 
-  // 자가정화: 기존 pool에서 노이즈 제거
-  const cleanedPool = await cleanPool(poolNormalized);
+  // 자가정화
+  const cleanedPool = await cleanPool(pool);
 
+  // 신규 키워드 추가
   const existingNorms = new Set(cleanedPool.map(item => norm(item.keyword)));
-
-  // 신규 키워드만 앞에 추가
   const newEntries = newKeywords
     .filter(kw => !existingNorms.has(norm(kw)))
     .map(kw => ({ keyword: kw, addedAt: today }));
 
   const merged = [...newEntries, ...cleanedPool].slice(0, 100);
-
   await redis.set('keyword_pool', JSON.stringify(merged));
   console.log(`[updateKeywordPool] pool 크기: ${merged.length} (신규: ${newEntries.length}개)`);
   return merged;
@@ -325,8 +319,7 @@ async function getBlogPostCount(keywords) {
         }
       );
       const data = await res.json();
-      const total = (data.total && data.total > 0) ? data.total : 1000;
-      results.push({ keyword: kw, total });
+      results.push({ keyword: kw, total: data.total > 0 ? data.total : 1000 });
     } catch {
       results.push({ keyword: kw, total: 1000 });
     }
@@ -335,7 +328,7 @@ async function getBlogPostCount(keywords) {
 }
 
 // ─────────────────────────────────────────
-// Step 7: 키워드 정제 (사용자 노출용)
+// Step 7: 키워드 정제 (사용자 노출용 표기 정규화)
 // ─────────────────────────────────────────
 async function polishKeywords(keywords) {
   const kwList = keywords.map((k, i) => `${i}:${k}`).join('\n');
@@ -358,14 +351,13 @@ async function polishKeywords(keywords) {
 
 규칙:
 - 한국어 맞춤법에 맞게 띄어쓰기 교정 (예: 갓생루틴 → 갓생 루틴, 무지출챌린지 → 무지출 챌린지)
-- 브랜드+제품 조합은 자연스러운 띄어쓰기 (예: 다이슨에어스트레이트너 → 다이슨 에어스트레이트너)
+- 브랜드+제품 조합은 자연스러운 띄어쓰기 유지
 - 앞뒤 불필요한 특수문자 제거
-- 의미가 명확하도록 너무 붙어있는 단어는 띄워줘
-- 단, 원래 뜻이나 고유명사는 절대 바꾸지 마
+- 원래 뜻이나 고유명사는 절대 바꾸지 마
 - 이미 자연스러운 것은 그대로 유지
 
 반드시 JSON으로만: {"0":"정제된키워드","1":"정제된키워드",...}
-번호는 입력과 동일하게. 다른 설명 없이 JSON만.`,
+다른 설명 없이 JSON만.`,
             },
             { role: 'user', content: kwList },
           ],
@@ -379,7 +371,6 @@ async function polishKeywords(keywords) {
     const data = await res.json();
     const text = data.result?.message?.content || '{}';
     const polished = JSON.parse(text.replace(/```json|```/g, '').trim());
-    // 결과 적용 (실패한 인덱스는 원본 유지)
     return keywords.map((kw, i) => polished[String(i)] || kw);
   } catch (e) {
     console.log('[polishKeywords] 실패, 원본 유지:', e.message);
@@ -466,70 +457,51 @@ function daysDiff(dateStr) {
 // ─────────────────────────────────────────
 module.exports = async (req, res) => {
   try {
-    // Step 1: 그물 키워드로 블로그 제목 수집
     const allTitles = await collectBlogTitles();
     if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
-    // Step 2: HyperCLOVA X 키워드 추출 + 코드 필터
     const refined = await extractTrendKeywords(allTitles);
     if (!refined.length) throw new Error('키워드 추출 실패');
 
-    // Step 3: 실제 제목 존재 검증
     const verified = verifyFrequency(refined, allTitles);
 
-    // Step 4: 키워드 풀 누적 (진입일 기록)
     const keywordPool = await updateKeywordPool(verified);
     if (!keywordPool.length) throw new Error('키워드 풀 없음');
 
-    // Step 5: DataLab 검색량 조회 (최신 40개)
-    const queryKeywords = keywordPool.slice(0, 40).map(item =>
-      typeof item === 'string' ? item : item.keyword
-    );
+    const queryKeywords = keywordPool.slice(0, 40).map(item => item.keyword);
     const rawTrends = await getSearchTrends(queryKeywords);
     if (!rawTrends.length) throw new Error('트렌드 조회 실패');
 
-    // Step 6: 포스팅 수 조회 (상위 20개)
     const top20 = [...rawTrends].sort((a, b) => b.weeklyRate - a.weeklyRate).slice(0, 20).map(t => t.keyword);
     const postCounts = await getBlogPostCount(top20);
 
-    // 랭킹 계산 — 신규 진입 보너스 포함
     const postValues = postCounts.map(p => p.total);
     const medianPost = median(postValues);
     const postCountMap = Object.fromEntries(postCounts.map(p => [p.keyword, p.total]));
     const maxPost = Math.max(...postValues, 1);
-    const weeklyRates = rawTrends.map(t => t.weeklyRate);
-    const maxRate = Math.max(...weeklyRates, 1);
+    const maxRate = Math.max(...rawTrends.map(t => t.weeklyRate), 1);
 
-    // 키워드별 진입일 맵
     const addedAtMap = Object.fromEntries(
-      keywordPool.map(item =>
-        typeof item === 'string'
-          ? [item, '2026-01-01']
-          : [item.keyword, item.addedAt || '2026-01-01']
-      )
+      keywordPool.map(item => [item.keyword, item.addedAt || '2026-01-01'])
     );
 
     const ranked = rawTrends.map(t => {
       const postCount = postCountMap[t.keyword] || 0;
-      const normalizedRate = t.weeklyRate / maxRate;
-      const normalizedPost = postCount / maxPost;
-
-      // 신규 진입 보너스: 7일 이내 진입 키워드에 +0.15
       const daysInPool = daysDiff(addedAtMap[t.keyword] || '2026-01-01');
       const newBonus = daysInPool <= 7 ? 0.15 : 0;
 
-      const score = normalizedRate * 0.6 + normalizedPost * 0.1
-        + (t.weeklyRate > 50 ? 0.15 : t.weeklyRate > 10 ? 0.08 : 0)
+      // 점수: 검색량 변화율 60% + 포스팅수 10% + 신규 진입 보너스 15%
+      const score = (t.weeklyRate / maxRate) * 0.6
+        + (postCount / maxPost) * 0.1
         + newBonus;
 
-      const trend = classifyTrend(t.weeklyRate, postCount, medianPost);
       return {
         keyword: t.keyword,
         score,
         changeRate: t.weeklyRate,
         risingRate: t.risingRate,
         postCount,
-        trend,
+        trend: classifyTrend(t.weeklyRate, postCount, medianPost),
         values: t.values,
         isNew: daysInPool <= 7,
       };
@@ -537,7 +509,7 @@ module.exports = async (req, res) => {
     .filter(t => t.postCount < 500000)
     .sort((a, b) => b.score - a.score);
 
-    // 중복 제거
+    // 중복 제거 (짧은 키워드 우선)
     const sortedForDedup = [...ranked].sort((a, b) => {
       const aBase = normKw(a.keyword);
       const bBase = normKw(b.keyword);
@@ -557,7 +529,6 @@ module.exports = async (req, res) => {
     }
     const finalRanked = deduped.sort((a, b) => b.score - a.score).slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
 
-    // 급상승
     const risingRanked = [...finalRanked]
       .filter(k => k.risingRate > 0)
       .sort((a, b) => b.risingRate - a.risingRate)
@@ -572,17 +543,15 @@ module.exports = async (req, res) => {
     });
     console.log('[신규 키워드]', finalRanked.filter(k => k.isNew).map(k => k.keyword));
 
-    // Step 7: 키워드 정제 (사용자 노출용 띄어쓰기/표기 정규화)
-    const rawKeywordNames = finalRanked.map(k => k.keyword);
-    const polishedNames = await polishKeywords(rawKeywordNames);
+    // 키워드 정제
+    const polishedNames = await polishKeywords(finalRanked.map(k => k.keyword));
     console.log('[polishKeywords] 정제 결과:', polishedNames.slice(0, 5));
     finalRanked.forEach((k, i) => { k.keyword = polishedNames[i]; });
 
-    // Step 8: 코멘트 생성
+    // 코멘트 생성
     const commentsRaw = await generateComments(finalRanked.slice(0, 10));
     const comments = finalRanked.slice(0, 10).map((_, i) => commentsRaw[String(i)] || '');
 
-    // KV 저장
     const result = {
       updatedAt: new Date().toISOString(),
       keywords: finalRanked.map((k, i) => ({
