@@ -169,8 +169,65 @@ function verifyFrequency(keywords, titles) {
 }
 
 // ─────────────────────────────────────────
-// Step 4: 키워드 풀 누적 (진입일 기록)
+// Step 4: 키워드 풀 누적 (진입일 기록 + 자가정화)
 // ─────────────────────────────────────────
+async function cleanPool(pool) {
+  if (pool.length === 0) return pool;
+  const kwList = pool.map((item, i) => `${i}:${typeof item === 'string' ? item : item.keyword}`).join('\n');
+  try {
+    const res = await fetch(
+      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `아래는 네이버 블로그 트렌드 키워드 풀이야.
+이 중에서 "트렌드 키워드로서 가치 없는 것"의 번호만 골라줘.
+
+제거 대상:
+- 운동, 요리, 패션처럼 언제나 검색되는 카테고리 단어
+- 추천, 후기, 꿀팁, 신상, 할인처럼 수식어 단독
+- 지역명 단독 또는 지역+업종 조합
+- 사람 이름, 사건사고, 뉴스성 단어
+- 의류 카테고리 단독 (티셔츠, 블라우스, 스카프 등)
+
+유지 대상:
+- 구체적인 제품명, 음식명 (황치즈칩, 버터떡 등)
+- 트렌드어+행동 조합 (갓생루틴, 무지출챌린지 등)
+- 브랜드+제품 조합 (갤럭시 S26 울트라 등)
+
+반드시 JSON 배열로만: [제거할번호, ...]
+제거할 것이 없으면 []
+다른 설명 없이 JSON만.`,
+            },
+            { role: 'user', content: kwList },
+          ],
+          maxCompletionTokens: 500,
+          temperature: 0.1,
+          repetitionPenalty: 1.0,
+          thinking: { effort: 'none' },
+        }),
+      }
+    );
+    const data = await res.json();
+    const text = data.result?.message?.content || '[]';
+    const removeIndices = new Set(JSON.parse(text.replace(/```json|```/g, '').trim()));
+    const cleaned = pool.filter((_, i) => !removeIndices.has(i));
+    console.log(`[cleanPool] ${pool.length}개 → ${cleaned.length}개 (${pool.length - cleaned.length}개 제거)`);
+    return cleaned;
+  } catch (e) {
+    console.log('[cleanPool] 실패, 원본 유지:', e.message);
+    return pool;
+  }
+}
+
 async function updateKeywordPool(newKeywords) {
   let pool = [];
   try {
@@ -186,20 +243,22 @@ async function updateKeywordPool(newKeywords) {
   const today = getDateString(0);
   const norm = s => s.replace(/\s+/g, '').toLowerCase();
 
-  // 기존 풀은 { keyword, addedAt } 형태로 저장
   // 하위 호환: string이면 변환
   const poolNormalized = pool.map(item =>
     typeof item === 'string' ? { keyword: item, addedAt: '2026-01-01' } : item
   );
 
-  const existingNorms = new Set(poolNormalized.map(item => norm(item.keyword)));
+  // 자가정화: 기존 pool에서 노이즈 제거
+  const cleanedPool = await cleanPool(poolNormalized);
+
+  const existingNorms = new Set(cleanedPool.map(item => norm(item.keyword)));
 
   // 신규 키워드만 앞에 추가
   const newEntries = newKeywords
     .filter(kw => !existingNorms.has(norm(kw)))
     .map(kw => ({ keyword: kw, addedAt: today }));
 
-  const merged = [...newEntries, ...poolNormalized].slice(0, 100);
+  const merged = [...newEntries, ...cleanedPool].slice(0, 100);
 
   await redis.set('keyword_pool', JSON.stringify(merged));
   console.log(`[updateKeywordPool] pool 크기: ${merged.length} (신규: ${newEntries.length}개)`);
