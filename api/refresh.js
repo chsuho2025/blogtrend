@@ -398,16 +398,36 @@ module.exports = async (req, res) => {
     const keywordPool = await updateKeywordPool(refined);
     if (!keywordPool.length) throw new Error('키워드 풀 없음');
 
-    const queryKeywords = keywordPool.slice(0, 40).map(item => item.keyword);
-    const rawTrends = await getSearchTrends(queryKeywords);
+    // pool 앞 40개 포스팅 수 조회 → 50만 초과 제거 → 중복 제거 → DataLab 조회
+    const poolKeywords = keywordPool.slice(0, 40).map(item => item.keyword);
+    const poolPostCounts = await getBlogPostCount(poolKeywords);
+    const poolPostMap = Object.fromEntries(poolPostCounts.map(p => [p.keyword, p.total]));
+
+    // 50만 초과 제거
+    const filteredPool = poolKeywords.filter(kw => (poolPostMap[kw] || 0) < 500000);
+    console.log(`[preFilter] 50만 초과 제거: ${poolKeywords.length}개 → ${filteredPool.length}개`);
+
+    // 중복 제거 (짧은 키워드 우선)
+    const dedupedPool = [];
+    const sortedPool = [...filteredPool].sort((a, b) => normKw(a).length - normKw(b).length);
+    for (const kw of sortedPool) {
+      const n = normKw(kw);
+      if (n.length < 2) { dedupedPool.push(kw); continue; }
+      const isDup = dedupedPool.some(d => {
+        const nd = normKw(d);
+        if (nd.length < 2) return false;
+        return n.includes(nd) || nd.includes(n);
+      });
+      if (!isDup) dedupedPool.push(kw);
+    }
+    console.log(`[preFilter] 중복 제거: ${filteredPool.length}개 → ${dedupedPool.length}개`);
+
+    const rawTrends = await getSearchTrends(dedupedPool);
     if (!rawTrends.length) throw new Error('트렌드 조회 실패');
 
-    const top20 = [...rawTrends].sort((a, b) => b.weeklyRate - a.weeklyRate).slice(0, 20).map(t => t.keyword);
-    const postCounts = await getBlogPostCount(top20);
-
-    const postValues = postCounts.map(p => p.total);
+    const postValues = dedupedPool.map(kw => poolPostMap[kw] || 0);
     const medianPost = median(postValues);
-    const postCountMap = Object.fromEntries(postCounts.map(p => [p.keyword, p.total]));
+    const postCountMap = poolPostMap;
     const maxPost = Math.max(...postValues, 1);
     const maxRate = Math.max(...rawTrends.map(t => t.weeklyRate), 1);
 
@@ -436,27 +456,10 @@ module.exports = async (req, res) => {
         isNew: daysInPool <= 7,
       };
     })
-    .filter(t => t.postCount < 500000)
     .sort((a, b) => b.score - a.score);
 
-    // 중복 제거 (짧은 키워드 우선)
-    const sortedForDedup = [...ranked].sort((a, b) => {
-      const aBase = normKw(a.keyword);
-      const bBase = normKw(b.keyword);
-      if (aBase.length !== bBase.length) return aBase.length - bBase.length;
-      return b.score - a.score;
-    });
-    const deduped = [];
-    for (const item of sortedForDedup) {
-      const normItem = normKw(item.keyword);
-      if (normItem.length < 2) { deduped.push(item); continue; }
-      const isDup = deduped.some(d => {
-        const normD = normKw(d.keyword);
-        if (normD.length < 2) return false;
-        return normItem.includes(normD) || normD.includes(normItem);
-      });
-      if (!isDup) deduped.push(item);
-    }
+    // 최종 랭킹 (DataLab 조회 후 추가 중복 없으므로 그대로 사용)
+    const deduped = ranked;
     const finalRanked = deduped.sort((a, b) => b.score - a.score).slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
 
     const risingRanked = [...finalRanked]
