@@ -843,6 +843,8 @@ function renderAll(data) {
           </div>
           <div class="period-tabs">
             <button class="period-tab active">1주</button>
+            <button class="period-tab">2주</button>
+            <button class="period-tab">4주</button>
           </div>
         </div>
         <div class="chart-wrap">
@@ -980,7 +982,10 @@ function drawChart(top5, days = 7) {
 
   const datasets = top5.map((kw, i) => {
     const allVals = kw.values || [];
-    const raw = allVals.length >= days ? allVals.slice(-days) : Array.from({length: days}, () => 0);
+    // 있는 데이터만 사용, 부족하면 앞을 0으로 패딩
+    const raw = allVals.length >= days
+      ? allVals.slice(-days)
+      : [...Array.from({length: days - allVals.length}, () => 0), ...allVals];
     // 각 키워드를 0~100으로 정규화
     const maxVal = Math.max(...raw, 1);
     const minVal = Math.min(...raw);
