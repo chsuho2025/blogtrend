@@ -215,7 +215,6 @@ async function getSearchTrends(keywords, mode = 'weekly') {
           const risingRate = avg(prev3) > 0 ? ((avg(recent3) - avg(prev3)) / avg(prev3)) * 100 : 0;
 
           if (mode === 'both') {
-            if (results.length === 0) console.log('[getSearchTrends] values 길이:', values.length, 'result.data 샘플:', JSON.stringify(result.data.slice(0,3)));
             results.push({ keyword: result.title, weeklyRate, risingRate, values });
           } else if (mode === 'rising') {
             results.push({ keyword: result.title, changeRate: risingRate, values });
@@ -392,25 +391,31 @@ module.exports = async (req, res) => {
     .sort((a, b) => b.score - a.score);
 
     // 중복 키워드 제거
-    // 전략: 키워드 쌍을 비교해서 한쪽이 다른쪽을 포함하면 점수 높은 것만 남김
     function normKw(kw) {
       if (typeof kw !== 'string') return '';
-      return kw.replace(/(레시피|추천|후기|방법|효능|사용법|퍼퓸|프리미엄|정품)/g, '').replace(/\s+/g, '').trim();
+      return kw.replace(/(레시피|추천|후기|방법|효능|사용법|퍼퓸|프리미엄|정품|만들기|하는법)/g, '').replace(/\s+/g, '').trim();
     }
+    // 짧은 키워드(더 일반적인 것) 우선 정렬 후 중복 제거
+    const sortedForDedup = [...ranked].sort((a, b) => {
+      const aBase = normKw(a.keyword);
+      const bBase = normKw(b.keyword);
+      // 길이 같으면 점수 높은 것 우선, 길이 다르면 짧은 것 우선
+      if (aBase.length !== bBase.length) return aBase.length - bBase.length;
+      return b.score - a.score;
+    });
     const deduped = [];
-    for (const item of ranked) {
+    for (const item of sortedForDedup) {
       const normItem = normKw(item.keyword);
+      if (normItem.length < 2) { deduped.push(item); continue; }
       const isDup = deduped.some(d => {
         const normD = normKw(d.keyword);
-        // 한쪽이 다른쪽에 포함되는 경우 - 이미 deduped에 있는 게 더 짧으면(일반적) item은 중복
-        if (normItem.includes(normD) && normD.length <= normItem.length) return true;
-        // deduped에 있는 게 더 길면(구체적) item이 더 일반적 → item 유지, d 제거는 별도 처리
-        if (normD.includes(normItem) && normItem.length <= normD.length) return true;
-        return false;
+        if (normD.length < 2) return false;
+        return normItem.includes(normD) || normD.includes(normItem);
       });
       if (!isDup) deduped.push(item);
     }
-    const finalRanked = deduped.slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
+    // 다시 점수 순으로 정렬
+    const finalRanked = deduped.sort((a, b) => b.score - a.score).slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
 
     // 7. 급상승 랭킹
     const risingRateMap = Object.fromEntries(risingTrends.map(t => [t.keyword, t.changeRate]));
