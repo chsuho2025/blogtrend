@@ -99,7 +99,11 @@ function countFrequency(titles) {
 }
 
 async function extractTrendKeywords(titles) {
-  const freqList = countFrequency(titles);
+  // 그물 키워드 자체는 빈도 목록에서 제외 (범용어라 노이즈)
+  const NET_SET = new Set(NET_KEYWORDS.map(k => k.replace(/\s+/g, '').toLowerCase()));
+  const norm = s => s.replace(/\s+/g, '').toLowerCase();
+
+  const freqList = countFrequency(titles).filter(({ kw }) => !NET_SET.has(norm(kw)));
   console.log(`[extractTrendKeywords] 빈도 2회 이상: ${freqList.length}개, top10:`, freqList.slice(0, 10).map(f => `${f.kw}(${f.cnt})`));
 
   const kwText = freqList.slice(0, 300).map(f => `${f.kw}(${f.cnt})`).join(', ');
@@ -281,11 +285,10 @@ async function polishKeywords(keywords) {
 각 키워드를 사용자가 보기 편하게 다듬어줘.
 
 규칙:
-- 한국어 맞춤법에 맞게 띄어쓰기 교정 (예: 갓생루틴 → 갓생 루틴, 무지출챌린지 → 무지출 챌린지)
-- 브랜드+제품 조합은 자연스러운 띄어쓰기 유지
-- 앞뒤 불필요한 특수문자 제거
-- 원래 뜻이나 고유명사는 절대 바꾸지 마
-- 이미 자연스러운 것은 그대로 유지
+- 붙어있는 합성어는 자연스러운 띄어쓰기로 교정 (예: 갓생루틴 → 갓생 루틴)
+- 고유명사, 브랜드명, 제품명은 절대 쪼개지 마 (예: 황치즈칩 → 황치즈칩, 버터떡 → 버터떡, 오뚜기 진밀면 → 오뚜기 진밀면)
+- 이미 자연스러운 것은 절대 바꾸지 마
+- 앞뒤 불필요한 특수문자만 제거
 
 반드시 JSON으로만: {"0":"정제된키워드","1":"정제된키워드",...}
 다른 설명 없이 JSON만.`,
