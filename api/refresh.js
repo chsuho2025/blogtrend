@@ -351,10 +351,19 @@ async function generateComments(topKeywords) {
 // ─────────────────────────────────────────
 // 유틸
 // ─────────────────────────────────────────
-function classifyTrend(changeRate, postCount, medianPostCount) {
-  if (changeRate >= 30 && postCount < medianPostCount) return '유행예감';
-  if (changeRate > 0) return '유행중';
-  return '유행지남';
+function classifyTrend(weeklyRate, risingRate, postCount, medianPostCount) {
+  // 1차: risingRate(최근 3일) 우선 판단
+  if (risingRate >= 20) {
+    return postCount < medianPostCount ? '유행예감' : '유행중';
+  }
+  if (risingRate <= -20) return '유행지남';
+
+  // 2차: 보합 구간(-20~20) → weeklyRate로 판단
+  if (weeklyRate >= 10) return '유행중';
+  if (weeklyRate <= -10) return '유행지남';
+
+  // 3차: 둘 다 보합 → risingRate 방향으로 미세 판단
+  return risingRate >= 0 ? '유행중' : '유행지남';
 }
 
 function getDateString(daysOffset) {
@@ -438,14 +447,24 @@ module.exports = async (req, res) => {
       keywordPool.map(item => [item.keyword, item.addedAt || '2026-01-01'])
     );
 
-    const ranked = rawTrends.map(t => {
+    const ranked = rawTrends.filter(t => {
+      // 최근 7일 평균 검색량이 너무 낮으면 제외 (분모가 작아서 변화율이 뻥튀기되는 문제 방지)
+      const recent7avg = avg(t.values.slice(-7));
+      if (recent7avg < 1.0) {
+        console.log(`[ranked] 검색량 낮아 제외: ${t.keyword} (7일평균 ${recent7avg.toFixed(2)})`);
+        return false;
+      }
+      return true;
+    }).map(t => {
       const postCount = postCountMap[t.keyword] || 0;
       const daysInPool = daysDiff(addedAtMap[t.keyword] || '2026-01-01');
       const newBonus = daysInPool <= 7 ? 0.15 : 0;
 
       // 점수: 검색량 변화율 60% + 포스팅수 10% + 신규 진입 보너스 15%
-      const score = (t.weeklyRate / maxRate) * 0.6
-        + (postCount / maxPost) * 0.1
+      const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
+      const risingScore = t.risingRate > 0 ? (t.risingRate / maxRising) * 0.3 : 0;
+      const score = (t.weeklyRate / maxRate) * 0.55
+        + risingScore
         + newBonus;
 
       return {
@@ -454,7 +473,7 @@ module.exports = async (req, res) => {
         changeRate: t.weeklyRate,
         risingRate: t.risingRate,
         postCount,
-        trend: classifyTrend(t.weeklyRate, postCount, medianPost),
+        trend: classifyTrend(t.weeklyRate, t.risingRate, postCount, medianPost),
         values: t.values,
         isNew: daysInPool <= 7,
       };
