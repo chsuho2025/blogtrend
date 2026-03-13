@@ -215,6 +215,7 @@ async function getSearchTrends(keywords, mode = 'weekly') {
           const risingRate = avg(prev3) > 0 ? ((avg(recent3) - avg(prev3)) / avg(prev3)) * 100 : 0;
 
           if (mode === 'both') {
+            if (results.length === 0) console.log('[getSearchTrends] values 길이:', values.length, '앞5개:', values.slice(0,5));
             results.push({ keyword: result.title, weeklyRate, risingRate, values });
           } else if (mode === 'rising') {
             results.push({ keyword: result.title, changeRate: risingRate, values });
@@ -444,7 +445,7 @@ module.exports = async (req, res) => {
           postCount: k.postCount,
           trend: k.trend,
           comment: comments[i] || '',
-          values: trendData ? trendData.values.slice(-7) : [],
+          values: trendData ? trendData.values.slice(-28) : [],
         };
       }),
       rising: risingRanked.map((k, i) => ({
