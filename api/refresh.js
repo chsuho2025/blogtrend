@@ -115,7 +115,7 @@ async function extractTrendKeywords(titles) {
                 content: chunk.join('\n'),
               },
             ],
-            maxCompletionTokens: 1000,
+            maxCompletionTokens: 2000,
             temperature: 0.3,
             repetitionPenalty: 1.1,
             thinking: { effort: 'none' },
