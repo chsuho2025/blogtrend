@@ -98,6 +98,7 @@ async function extractTrendKeywords(titles) {
           headers: {
             'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
           body: JSON.stringify({
             messages: [
@@ -146,6 +147,7 @@ async function extractTrendKeywords(titles) {
       allKeywords.push(...keywords);
     } catch (e) {
       console.log(`[extractTrendKeywords] chunk${Math.floor(i/CHUNK_SIZE)+1} 실패:`, e.message);
+
     }
   }
 
@@ -171,6 +173,7 @@ async function bloggerPick(keywords) {
           headers: {
             'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
             'Content-Type': 'application/json',
+            'Accept': 'application/json',
           },
           body: JSON.stringify({
             messages: [
@@ -349,6 +352,7 @@ async function generateComments(topKeywords) {
         headers: {
           'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           messages: [
