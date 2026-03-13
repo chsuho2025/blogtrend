@@ -152,8 +152,8 @@ async function extractTrendKeywords(titles) {
     }
   }
 
-  // 중복 제거
-  const unique = [...new Set(allKeywords)];
+  // 중복 제거 + 너무 긴 키워드 제거 (20자 초과는 제목이지 키워드가 아님)
+  const unique = [...new Set(allKeywords)].filter(k => k.length <= 20);
   console.log(`[extractTrendKeywords] 전체 ${unique.length}개 추출`);
   return unique;
 }
@@ -192,6 +192,7 @@ async function bloggerPick(keywords) {
 - 목록에 없는 키워드를 새로 만들거나 변형하지 마
 - 목록에 있는 키워드를 그대로만 골라줘
 - 지역명+업종 조합은 선택하지 마
+- 다른 블로거들도 고를 것 같은 뻔한 인기 키워드보다, 네 전문 분야에 해당하는 키워드를 우선으로 골라줘
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
@@ -202,7 +203,7 @@ async function bloggerPick(keywords) {
               },
             ],
             maxCompletionTokens: 500,
-            temperature: 0.5,
+            temperature: 0.8,
             repetitionPenalty: 1.1,
             thinking: { effort: "none" },
           }),
