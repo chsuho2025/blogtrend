@@ -536,6 +536,24 @@ module.exports = async (req, res) => {
     };
 
     await redis.set('trend_data', JSON.stringify(result));
+
+    // 히스토리 누적 (최근 30회)
+    let history = [];
+    try {
+      const raw = await redis.get('trend_history');
+      if (raw) history = typeof raw === 'string' ? JSON.parse(raw) : raw;
+    } catch(e) {}
+    history.push({
+      timestamp: result.updatedAt,
+      keywords: finalRanked.slice(0, 10).map(k => ({
+        keyword: k.keyword,
+        changeRate: Math.round(k.changeRate),
+        risingRate: Math.round(k.risingRate),
+        rank: k.rank,
+      })),
+    });
+    if (history.length > 30) history = history.slice(-30);
+    await redis.set('trend_history', JSON.stringify(history));
     res.status(200).json({
       success: true,
       updatedAt: result.updatedAt,

@@ -7,12 +7,18 @@ const redis = new Redis({
 
 module.exports = async (req, res) => {
   try {
-    const raw = await redis.get('trend_data');
+    const [raw, histRaw] = await Promise.all([
+      redis.get('trend_data'),
+      redis.get('trend_history'),
+    ]);
     if (!raw) {
       return res.status(404).json({ error: '데이터 없음. /api/refresh 먼저 실행 필요' });
     }
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    res.status(200).json(data);
+    const history = histRaw
+      ? (typeof histRaw === 'string' ? JSON.parse(histRaw) : histRaw)
+      : [];
+    res.status(200).json({ ...data, history });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });
