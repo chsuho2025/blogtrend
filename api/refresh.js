@@ -68,83 +68,73 @@ async function collectBlogTitles() {
 }
 
 // ─────────────────────────────────────────
-// Step 2: 단순 문자열 빈도 카운트 → 상위 100개
+// Step 2: HyperCLOVA X — 제목에서 트렌드 키워드 50개 추출
+// 400개씩 4덩어리로 나눠서 각각 뽑고 합침
 // ─────────────────────────────────────────
-function countFrequency(titles) {
-  const freq = {};
-  for (const title of titles) {
-    // 2~10글자 단어 단위로 슬라이딩 윈도우
-    const words = title.split(/[\s\[\](){}「」『』<>·•:!?.,~\-_]+/).filter(w => w.length >= 2);
-    for (const word of words) {
-      // 그물 키워드 자체는 제외 (씨드 오염 방지)
-      if (NET_KEYWORDS.includes(word)) continue;
-      // 조사/어미 패턴 제외
-      if (/^(이|가|은|는|을|를|의|에|도|만|로|으로|와|과|한|하고|에서|부터|까지)$/.test(word)) continue;
-      freq[word] = (freq[word] || 0) + 1;
-    }
-  }
-  // 빈도 순 정렬 → 상위 100개
-  const sorted = Object.entries(freq)
-    .filter(([w, c]) => c >= 2) // 2회 이상만
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 100);
-  console.log(`[countFrequency] 상위 10개:`, sorted.slice(0, 10).map(([w, c]) => `${w}(${c})`));
-  return sorted; // [[word, count], ...]
-}
+async function extractTrendKeywords(titles) {
+  const CHUNK_SIZE = 400;
+  const allKeywords = [];
 
-// ─────────────────────────────────────────
-// Step 3: HyperCLOVA X — 중복/조사 정제 → 50개
-// ─────────────────────────────────────────
-async function refineKeywords(freqList) {
-  const input = freqList.map(([w, c]) => `${w}(${c}회)`).join(', ');
-  try {
-    const res = await fetch(
-      'https://clovastudio.stream.ntruss.com/testapp/v3/chat-completions/HCX-DASH-002',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: `너는 키워드 정제 전문가야.
-아래는 네이버 블로그 제목에서 추출한 단어와 등장 횟수야.
-다음 기준으로 정제해서 트렌드 키워드 50개만 JSON 배열로 반환해:
+  for (let i = 0; i < Math.min(titles.length, 1600); i += CHUNK_SIZE) {
+    const chunk = titles.slice(i, i + CHUNK_SIZE);
+    const titleText = chunk.join('\n');
+    try {
+      const res = await fetch(
+        'https://clovastudio.stream.ntruss.com/testapp/v3/chat-completions/HCX-DASH-002',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content: `너는 네이버 블로그 트렌드 분석가야.
+아래는 최근 네이버 블로그 제목 목록이야.
+이 제목들에서 지금 실제로 유행하고 있는 구체적인 트렌드 키워드 15개를 뽑아줘.
 
-정제 기준:
-- 조사/어미가 붙은 단어는 원형으로 변환 (예: "버터떡이" → "버터떡")
-- 같은 의미의 유사 단어는 빈도 높은 것 하나로 통합
-- 너무 일반적인 단어 제외 (예: 오늘, 진짜, 정말, 완전, 너무)
-- 광고성/스팸성 단어 제외
-- 구체적인 아이템명, 음식명, 트렌드어 우선
+선택 기준:
+- 구체적인 아이템명, 음식명, 제품명 (예: 상하이버터떡, 연세우유 황치즈크림빵)
+- 요즘 SNS에서 유행하는 챌린지, 트렌드어 (예: 갓생루틴, 무지출챌린지)
+- 제목에 2번 이상 등장하는 키워드 우선
+
+제외:
+- 맛집, 카페, 추천, 후기, 리뷰, 정리, 오늘, 진짜, 완전, 정말 같은 일반 단어
+- 날짜, 연도 (3월, 2026 등)
+- 지역명 단독 (서울, 부산 등)
+- 사람 이름, 뉴스성 키워드
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
-            },
-            {
-              role: 'user',
-              content: input,
-            },
-          ],
-          maxTokens: 500,
-          temperature: 0.3,
-          repetitionPenalty: 1.1,
-        }),
-      }
-    );
-    const data = await res.json();
-    const text = data.result?.message?.content || '[]';
-    const cleaned = text.replace(/```json|```/g, '').trim();
-    const keywords = JSON.parse(cleaned);
-    console.log(`[refineKeywords] 정제 후 ${keywords.length}개:`, keywords.slice(0, 10));
-    return keywords;
-  } catch (e) {
-    console.log('[refineKeywords] 실패:', e.message);
-    return freqList.slice(0, 50).map(([w]) => w);
+              },
+              {
+                role: 'user',
+                content: titleText,
+              },
+            ],
+            maxTokens: 300,
+            temperature: 0.3,
+            repetitionPenalty: 1.1,
+          }),
+        }
+      );
+      const data = await res.json();
+      const text = data.result?.message?.content || '[]';
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      const keywords = JSON.parse(cleaned);
+      console.log(`[extractTrendKeywords] chunk${Math.floor(i/CHUNK_SIZE)+1}: ${keywords.length}개 →`, keywords);
+      allKeywords.push(...keywords);
+    } catch (e) {
+      console.log(`[extractTrendKeywords] chunk${Math.floor(i/CHUNK_SIZE)+1} 실패:`, e.message);
+    }
   }
+
+  // 중복 제거
+  const unique = [...new Set(allKeywords)];
+  console.log(`[extractTrendKeywords] 전체 ${unique.length}개 추출`);
+  return unique;
 }
 
 // ─────────────────────────────────────────
@@ -392,14 +382,11 @@ module.exports = async (req, res) => {
     const allTitles = await collectBlogTitles();
     if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
-    // Step 2: 빈도 카운트 → 상위 100개
-    const freqList = countFrequency(allTitles);
-    if (!freqList.length) throw new Error('빈도 분석 실패');
+    // Step 2: HyperCLOVA X로 트렌드 키워드 50개 추출
+    const refined = await extractTrendKeywords(allTitles);
+    if (!refined.length) throw new Error('키워드 추출 실패');
 
-    // Step 3: HyperCLOVA X 정제 → 50개
-    const refined = await refineKeywords(freqList);
-
-    // Step 4: 7명 블로거 픽
+    // Step 3: 7명 블로거 픽
     const picked = await bloggerPick(refined);
 
     // Step 5: 빈도 재검증
