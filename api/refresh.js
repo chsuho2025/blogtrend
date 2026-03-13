@@ -389,6 +389,9 @@ function daysDiff(dateStr) {
 // ─────────────────────────────────────────
 module.exports = async (req, res) => {
   try {
+    await redis.del('keyword_pool');
+    console.log('[init] keyword_pool 초기화 완료');
+
     const allTitles = await collectBlogTitles();
     if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
