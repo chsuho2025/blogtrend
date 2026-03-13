@@ -130,9 +130,10 @@ async function extractTrendKeywords(titles) {
                 content: titleText,
               },
             ],
-            maxCompletionTokens: 300,
+            maxCompletionTokens: 1000,
             temperature: 0.3,
             repetitionPenalty: 1.1,
+            thinking: { effort: "none" },
           }),
         }
       );
@@ -198,9 +199,10 @@ async function bloggerPick(keywords) {
                 content: kwList,
               },
             ],
-            maxCompletionTokens: 200,
+            maxCompletionTokens: 500,
             temperature: 0.5,
             repetitionPenalty: 1.1,
+            thinking: { effort: "none" },
           }),
         }
       );
@@ -360,9 +362,10 @@ async function generateComments(topKeywords) {
             },
             { role: 'user', content: kwList },
           ],
-          maxCompletionTokens: 400,
+          maxCompletionTokens: 800,
           temperature: 0.5,
           repetitionPenalty: 1.1,
+          thinking: { effort: "none" },
         }),
       }
     );
