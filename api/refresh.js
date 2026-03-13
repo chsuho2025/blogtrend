@@ -75,96 +75,85 @@ async function collectBlogTitles() {
 }
 
 // ─────────────────────────────────────────
-// Step 2: 빈도 카운팅 → HCX-007 트렌드 선별
+// Step 2: HyperCLOVA X 키워드 추출
 // ─────────────────────────────────────────
-function countFrequency(titles) {
-  const freqMap = new Map();
-
-  for (const title of titles) {
-    const clean = title
-      .replace(/<[^>]+>/g, '')
-      .replace(/[^\uAC00-\uD7A3a-zA-Z0-9\s]/g, ' ')
-      .trim();
-
-    const tokens = clean.split(/\s+/).filter(t => t.length >= 2);
-
-    for (const token of tokens) {
-      if (/^\d+$/.test(token)) continue;
-      if (/^[a-zA-Z]{1,2}$/.test(token)) continue;
-      if (['quot', 'amp', 'lt', 'gt', 'apos', 'nbsp'].includes(token.toLowerCase())) continue;
-      freqMap.set(token, (freqMap.get(token) || 0) + 1);
-    }
-
-    for (let i = 0; i < tokens.length - 1; i++) {
-      const bigram = `${tokens[i]} ${tokens[i + 1]}`;
-      freqMap.set(bigram, (freqMap.get(bigram) || 0) + 1);
-    }
-  }
-
-  return [...freqMap.entries()]
-    .filter(([, cnt]) => cnt >= 2)
-    .sort((a, b) => b[1] - a[1])
-    .map(([kw, cnt]) => ({ kw, cnt }));
-}
-
 async function extractTrendKeywords(titles) {
-  // 그물 키워드 자체는 빈도 목록에서 제외 (범용어라 노이즈)
-  const NET_SET = new Set(NET_KEYWORDS.map(k => k.replace(/\s+/g, '').toLowerCase()));
-  const norm = s => s.replace(/\s+/g, '').toLowerCase();
+  const CHUNK_SIZE = 400;
+  const allKeywords = [];
 
-  const freqList = countFrequency(titles).filter(({ kw }) => !NET_SET.has(norm(kw)));
-  console.log(`[extractTrendKeywords] 빈도 2회 이상: ${freqList.length}개, top10:`, freqList.slice(0, 10).map(f => `${f.kw}(${f.cnt})`));
-
-  const kwText = freqList.slice(0, 300).map(f => `${f.kw}(${f.cnt})`).join(', ');
-
-  try {
-    const res = await fetch(
-      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
-      {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          messages: [
-            {
-              role: 'system',
-              content: `아래는 최근 네이버 블로그 제목에서 추출한 키워드와 등장 빈도야.
-이 중에서 "지금 네이버에서 사람들이 검색할 만한 트렌드 키워드"만 골라줘. 최대 60개.
+  for (let i = 0; i < Math.min(titles.length, 1600); i += CHUNK_SIZE) {
+    const chunk = titles.slice(i, i + CHUNK_SIZE);
+    try {
+      const res = await fetch(
+        'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify({
+            messages: [
+              {
+                role: 'system',
+                content: `너는 네이버 블로그 트렌드 분석가야.
+아래는 최근 네이버 블로그 제목 목록이야.
+이 제목들에서 "지금 이 키워드로 블로그를 쓰면 검색이 될 것 같다"고 판단되는 트렌드 키워드 15개를 뽑아줘.
 
 트렌드 키워드란:
-- 특정 제품명, 음식명, 브랜드명 (예: 황치즈칩, 갤럭시 S26, 오뚜기 진밀면)
-- 챌린지, 트렌드어 (예: 갓생, 무지출챌린지)
-- 요즘 뜨는 콘텐츠, 장소, 인물 (예: 나는솔로 30기, 벚꽃 개화시기)
+- 요즘 특별히 주목받는 구체적인 제품명, 음식명, 챌린지명 (예: 황치즈칩, 갓생루틴, 무지출챌린지)
+- 지금 이 시점에 유독 많이 검색되는 고유한 무언가
+- 막연한 카테고리가 아니라, 그 안의 특정 아이템
 
-제외:
-- 조사, 어미 단독 (예: 하는, 이런, 그런, 있는)
-- 너무 일반적인 단어 (예: 운동, 요리, 여행, 일상, 추천, 후기)
-- 숫자+단위 단독 (예: 100ml, 3월)
+트렌드 키워드가 아닌 것:
+- 언제나 검색되는 카테고리 단어 (예: 운동, 요리, 패션, 여행, 뷰티, 맛집, 추천, 후기)
+- 막연한 수식어 (예: 꿀팁, 신상, 할인, 솔직, 내돈내산)
+- 지역명 단독 또는 지역+업종 조합
+- 날짜, 연도 단독
+- 사람 이름, 사건사고, 뉴스성 단어
+- 30자 이상 긴 문장
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
-            },
-            { role: 'user', content: kwText },
-          ],
-          maxCompletionTokens: 2000,
-          temperature: 0.2,
-          repetitionPenalty: 1.0,
-          thinking: { effort: 'none' },
-        }),
-      }
-    );
-    const data = await res.json();
-    const text = data.result?.message?.content || '[]';
-    const keywords = JSON.parse(text.replace(/```json|```/g, '').trim());
-    console.log(`[extractTrendKeywords] HCX-007 선별: ${keywords.length}개 →`, keywords.slice(0, 20));
-    return keywords;
-  } catch (e) {
-    console.log('[extractTrendKeywords] HCX-007 실패, 빈도 상위로 대체:', e.message);
-    return freqList.slice(0, 60).map(f => f.kw);
+              },
+              {
+                role: 'user',
+                content: chunk.join('\n'),
+              },
+            ],
+            maxCompletionTokens: 2000,
+            temperature: 0.3,
+            repetitionPenalty: 1.1,
+            thinking: { effort: 'none' },
+          }),
+        }
+      );
+      const data = await res.json();
+      const text = data.result?.message?.content || '[]';
+      const keywords = JSON.parse(text.replace(/```json|```/g, '').trim());
+      console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1}: ${keywords.length}개 →`, keywords);
+      allKeywords.push(...keywords);
+    } catch (e) {
+      console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1} 실패:`, e.message);
+    }
   }
+
+  // 코드 필터: 타입, 최소 길이, 특수문자, 띄어쓰기 중복
+  const norm = s => s.replace(/\s+/g, '').toLowerCase();
+  const seenNorm = new Set();
+  const filtered = allKeywords.filter(kw => {
+    if (typeof kw !== 'string') return false;
+    if (kw.length < 2) return false;
+    if (/[\[\]【】()（）<>《》]/.test(kw)) return false;
+    const n = norm(kw);
+    if (seenNorm.has(n)) return false;
+    seenNorm.add(n);
+    return true;
+  });
+
+  console.log(`[extractTrendKeywords] 전체 ${allKeywords.length}개 추출 → 필터후 ${filtered.length}개`);
+  return filtered;
 }
 
 // ─────────────────────────────────────────
