@@ -78,22 +78,7 @@
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { animation: spin .7s linear infinite; display: inline-block; }
 
-    /* ── 갱신 배너 ── */
-    .refresh-banner {
-      display: none; position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
-      background: var(--black); color: var(--white); padding: 10px 20px;
-      border-radius: 24px; font-size: 13px; font-weight: 600;
-      box-shadow: 0 4px 16px rgba(0,0,0,0.2); z-index: 200;
-      display: flex; align-items: center; gap: 10px; cursor: pointer;
-      animation: slideDown .3s ease;
-    }
-    .refresh-banner.show { display: flex; }
-    @keyframes slideDown { from{opacity:0;transform:translateX(-50%) translateY(-8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-    .banner-apply {
-      background: var(--green); color: var(--white); border: none;
-      padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
-      cursor: pointer; font-family: 'Pretendard', sans-serif;
-    }
+
 
     /* ── TICKER ── */
     .ticker-bar { background: var(--white); border-bottom: 1px solid var(--border); }
@@ -545,12 +530,6 @@
   </div>
 </div>
 
-<!-- 갱신 배너 -->
-<div class="refresh-banner" id="refreshBanner" onclick="applyNewData()">
-  🔄 <span id="bannerText">새로운 데이터가 있어요</span>
-  <button class="banner-apply">적용</button>
-</div>
-
 <div class="main-wrap">
   <div class="left-col" id="leftCol">
     <div class="state-wrap">
@@ -631,7 +610,7 @@ let detailChartInstance = null;
 let globalKws = [];
 let globalHistory = [];
 let globalData = null;
-let pendingData = null;
+
 let activeHistoryIdx = -1;
 let checkedSet = new Set();
 let viewMode = localStorage.getItem('btr_viewMode') || 'compact';
@@ -722,44 +701,25 @@ function scheduleAutoRefresh() {
       const res = await fetch('/api/data');
       if (!res.ok) return;
       const newData = await res.json();
-      // 열린 패널 없으면 바로 적용, 있으면 배너 표시
-      const hasOpenPanel = !!document.querySelector('.detail-panel.open');
-      if (!hasOpenPanel) {
-        renderAll(newData);
-      } else {
-        pendingData = newData;
-        const banner = document.getElementById('refreshBanner');
-        document.getElementById('bannerText').textContent = '새로운 데이터가 있어요';
-        banner.classList.add('show');
-        setTimeout(() => banner.classList.remove('show'), 6000);
+      // 열린 패널 기억 후 바로 적용
+      const openPanel = document.querySelector('.detail-panel.open');
+      const openKeyword = openPanel
+        ? openPanel.closest('.rank-item-wrap')?.querySelector('.kw-name')?.textContent
+        : null;
+      renderAll(newData);
+      if (openKeyword) {
+        const idx = globalKws.findIndex(k => k.keyword === openKeyword);
+        if (idx >= 0) {
+          const row = document.querySelector(`#panel-${idx}`)?.previousElementSibling;
+          if (row) setTimeout(() => toggleDetail(row, openKeyword, idx), 100);
+        }
       }
     } catch(e) {}
     scheduleAutoRefresh();
   }, ms);
 }
 
-function applyNewData() {
-  if (pendingData) {
-    // 열린 패널 키워드 기억
-    const openPanel = document.querySelector('.detail-panel.open');
-    const openKeyword = openPanel
-      ? openPanel.closest('.rank-item-wrap')?.querySelector('.kw-name')?.textContent
-      : null;
 
-    renderAll(pendingData);
-    pendingData = null;
-
-    // 같은 키워드 패널 다시 열기
-    if (openKeyword) {
-      const idx = globalKws.findIndex(k => k.keyword === openKeyword);
-      if (idx >= 0) {
-        const row = document.querySelector(`#panel-${idx}`)?.previousElementSibling;
-        if (row) setTimeout(() => toggleDetail(row, openKeyword, idx), 100);
-      }
-    }
-  }
-  document.getElementById('refreshBanner').classList.remove('show');
-}
 
 // ── 데이터 로드 ──
 async function loadData() {
