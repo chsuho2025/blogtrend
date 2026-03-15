@@ -157,14 +157,20 @@ async function extractTrendKeywords(titles) {
 }
 
 // ─────────────────────────────────────────
-// Step 3: 키워드 풀 누적 (진입일 기록)
+// Step 3: 키워드 풀 누적 (이전 TOP20 고정 + 신규 추가)
 // ─────────────────────────────────────────
 async function updateKeywordPool(newKeywords) {
   let rawPool = [];
+  let top20Fixed = [];
+
   try {
-    const stored = await redis.get('keyword_pool');
-    if (stored) rawPool = typeof stored === 'string' ? JSON.parse(stored) : stored;
-    console.log('[updateKeywordPool] 기존 pool 크기:', rawPool.length);
+    const [poolStored, top20Stored] = await Promise.all([
+      redis.get('keyword_pool'),
+      redis.get('top20_pool'),
+    ]);
+    if (poolStored) rawPool = typeof poolStored === 'string' ? JSON.parse(poolStored) : poolStored;
+    if (top20Stored) top20Fixed = typeof top20Stored === 'string' ? JSON.parse(top20Stored) : top20Stored;
+    console.log('[updateKeywordPool] 기존 pool 크기:', rawPool.length, '/ 이전 TOP20:', top20Fixed.length);
   } catch (e) {
     console.log('[updateKeywordPool] pool 로드 실패:', e.message);
   }
@@ -177,22 +183,38 @@ async function updateKeywordPool(newKeywords) {
     typeof item === 'string' ? { keyword: item, addedAt: '2026-01-01' } : item
   );
 
-  // 신규 키워드 추가
-  const existingNorms = new Set(pool.map(item => norm(item.keyword)));
+  // 이전 TOP20을 고정 앵커로 설정 (addedAt 갱신해서 14일 TTL 리셋)
+  const top20Anchors = top20Fixed.map(kw => ({
+    keyword: kw,
+    addedAt: today,
+    isAnchor: true,
+  }));
+  const top20Norms = new Set(top20Fixed.map(norm));
+
+  // 신규 키워드 중 TOP20 앵커와 중복 아닌 것만 추가 (최대 20개)
+  const existingNorms = new Set([
+    ...pool.map(item => norm(item.keyword)),
+    ...top20Norms,
+  ]);
   const newEntries = newKeywords
     .filter(kw => !existingNorms.has(norm(kw)))
+    .slice(0, 20)
     .map(kw => ({ keyword: kw, addedAt: today }));
 
-  // 14일 지난 키워드 제거
+  // 14일 지난 키워드 제거 (앵커 제외)
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - 14);
   const cutoffStr = cutoff.toISOString().slice(0, 10);
-  const poolFiltered = pool.filter(item => (item.addedAt || '2026-01-01') >= cutoffStr);
+  const poolFiltered = pool.filter(item =>
+    !top20Norms.has(norm(item.keyword)) && // 앵커는 위에서 따로 처리
+    (item.addedAt || '2026-01-01') >= cutoffStr
+  );
   console.log(`[updateKeywordPool] 14일 초과 제거: ${pool.length}개 → ${poolFiltered.length}개`);
 
-  const merged = [...newEntries, ...poolFiltered].slice(0, 100);
+  // 구성: [이전 TOP20 앵커] + [신규 20개] + [기존 pool 잔여]
+  const merged = [...top20Anchors, ...newEntries, ...poolFiltered].slice(0, 100);
   await redis.set('keyword_pool', JSON.stringify(merged));
-  console.log(`[updateKeywordPool] pool 크기: ${merged.length} (신규: ${newEntries.length}개)`);
+  console.log(`[updateKeywordPool] pool 크기: ${merged.length} (앵커: ${top20Anchors.length}개, 신규: ${newEntries.length}개)`);
   return merged;
 }
 
@@ -535,6 +557,11 @@ module.exports = async (req, res) => {
     };
 
     await redis.set('trend_data', JSON.stringify(result));
+
+    // 이전 TOP20 키워드 목록 저장 (다음 리프레시에서 pool 앵커로 사용)
+    const top20Keywords = finalRanked.map(k => k.keyword);
+    await redis.set('top20_pool', JSON.stringify(top20Keywords));
+    console.log('[top20_pool] 저장:', top20Keywords.slice(0, 5));
 
     // 히스토리 누적 (최근 30회)
     let history = [];
