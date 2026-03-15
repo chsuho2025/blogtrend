@@ -1038,10 +1038,10 @@ async function toggleDetail(row, keyword, idx) {
         <div class="detail-stat-val gray">${kw?.postCount?.toLocaleString() || '—'}</div>
       </div>
     </div>
-    <button class="posts-btn" onclick="openPostsModal('${keyword.replace(/'/g, "\'")}', event)">
+    <button class="posts-btn" onclick="openPostsModal('${keyword.replace(/'/g, "\\'")}', event)">
       📝 최근 게시글 보기
     </button>
-  \`;
+  `;
 
   // 상세 차트 그리기
   if (kw?.values) drawDetailChart(idx, kw);
@@ -1059,10 +1059,7 @@ async function openPostsModal(keyword, e) {
 
   title.textContent = keyword;
   sub.textContent = '네이버 블로그 최신 게시글';
-  body.innerHTML = \`<div class="modal-loading">
-    <div class="loading-ring"></div>
-    <div class="state-text">게시글 불러오는 중...</div>
-  </div>\`;
+  body.innerHTML = '<div class="modal-loading"><div class="loading-ring"></div><div class="state-text">게시글 불러오는 중...</div></div>';
   modal.classList.add('show');
   document.body.style.overflow = 'hidden';
 
@@ -1076,18 +1073,19 @@ async function openPostsModal(keyword, e) {
       return;
     }
 
-    sub.textContent = \`최근 게시글 \${posts.length}개\`;
-    body.innerHTML = posts.map(p => {
+    sub.textContent = '최근 게시글 ' + posts.length + '개';
+    body.innerHTML = posts.map(function(p) {
       const date = p.postdate
         ? p.postdate.slice(0,4) + '.' + p.postdate.slice(4,6) + '.' + p.postdate.slice(6,8)
         : '';
-      return \`<a class="modal-post-item" href="\${p.link}" target="_blank" rel="noopener">
-        <div class="modal-post-title">\${p.title}</div>
-        \${p.description ? \`<div class="modal-post-desc">\${p.description}</div>\` : ''}
-        <div class="modal-post-meta">\${p.bloggerName || ''} · \${date}</div>
-      </a>\`;
+      const desc = p.description ? '<div class="modal-post-desc">' + p.description + '</div>' : '';
+      return '<a class="modal-post-item" href="' + p.link + '" target="_blank" rel="noopener">'
+        + '<div class="modal-post-title">' + p.title + '</div>'
+        + desc
+        + '<div class="modal-post-meta">' + (p.bloggerName || '') + ' · ' + date + '</div>'
+        + '</a>';
     }).join('');
-  } catch(e) {
+  } catch(err) {
     body.innerHTML = '<div class="modal-empty">불러오기 실패. 잠시 후 다시 시도해 주세요.</div>';
   }
 }
