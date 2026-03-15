@@ -8,9 +8,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     :root {
-      --green: #03C75A;
+      --green: #2DB400;
       --green-dim: #E8F9F0;
-      --green-dark: #029A46;
+      --green-dark: #1E8C00;
       --black: #111111;
       --gray-1: #222222;
       --gray-2: #444444;
@@ -331,14 +331,14 @@
       border-top: 1px solid #D0F0E0; transition: background .1s;
     }
     .early-item:first-child { border-top: none; }
-    .early-item:hover { background: rgba(3,199,90,0.06); }
+    .early-item:hover { background: rgba(45,180,0,0.06); }
     .early-rank { font-size: 13px; font-weight: 800; color: var(--green); width: 18px; text-align: center; flex-shrink: 0; }
     .early-info { flex: 1; min-width: 0; }
     .early-kw { font-size: 14px; font-weight: 700; color: var(--black); letter-spacing: -0.2px; }
     .early-meta { font-size: 11px; color: #52A875; margin-top: 2px; }
     .early-score {
       font-size: 12px; font-weight: 700; color: var(--green-dark);
-      background: rgba(3,199,90,0.12); padding: 3px 8px; border-radius: 12px;
+      background: rgba(45,180,0,0.12); padding: 3px 8px; border-radius: 12px;
       white-space: nowrap; flex-shrink: 0;
     }
     .early-empty { padding: 20px; text-align: center; }
@@ -656,9 +656,9 @@ function sparkline(values, width=72, height=28, isChecked=false) {
   const linePath = `M${coords[0]} ` + coords.slice(1).map(c => `L${c}`).join(' ');
 
   const isUp = pts[pts.length-1] >= pts[0];
-  const color = isChecked ? '#03C75A' : (isUp ? '#AAAAAA' : '#CCCCCC');
+  const color = isChecked ? '#2DB400' : (isUp ? '#AAAAAA' : '#CCCCCC');
   const fillColor = isChecked
-    ? 'rgba(3,199,90,0.10)'
+    ? 'rgba(45,180,0,0.10)'
     : (isUp ? 'rgba(170,170,170,0.08)' : 'rgba(200,200,200,0.05)');
 
   return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
@@ -882,11 +882,43 @@ function buildMainContent() {
       </div>
     </div>
 
+    <!-- 실시간 랭킹 카드 -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">실시간 랭킹</div>
+          <div class="card-sub">네이버 블로그 트렌드 TOP ${kws.length}</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="view-toggle">
+            <button class="view-btn ${viewMode==='compact'?'active':''}" onclick="setViewMode('compact')">컴팩트</button>
+            <button class="view-btn ${viewMode==='detail'?'active':''}" onclick="setViewMode('detail')">상세</button>
+          </div>
+        </div>
+      </div>
+      ${hasCategory ? `
+      <div class="cat-tabs" id="catTabs">
+        <button class="cat-tab active" data-cat="all">전체</button>
+        <button class="cat-tab" data-cat="FOOD">음식</button>
+        <button class="cat-tab" data-cat="BEAUTY">뷰티</button>
+        <button class="cat-tab" data-cat="FASHION">패션</button>
+        <button class="cat-tab" data-cat="TECH">테크</button>
+        <button class="cat-tab" data-cat="LIFE">라이프</button>
+      </div>` : ''}
+      <div class="rank-header-row">
+        <span>순위</span><span>키워드</span>
+        <span style="text-align:right">검색변화</span>
+        <span style="text-align:right">추세</span>
+      </div>
+      <div id="rankList">${buildRankRows(kws)}</div>
+    </div>
+
   `;
 
   buildLegend(kws);
   drawChart(7);
   setupPeriodTabs();
+  if (hasCategory) setupCatTabs();
   rebuildHistoryTabs();
 }
 
@@ -897,8 +929,8 @@ function buildRankRows(kws) {
 
   const rows = filtered.map((kw, i) => {
     const numCls = kw.rank===1?'top1':kw.rank===2?'top2':kw.rank===3?'top3':'';
-    const isChecked = false; // 차트는 TOP5 고정, 카드 선택 연동 없음
-    const accentColor = kw.rank <= 3 ? 'var(--gray-2)' : 'var(--gray-5)';
+    const isChecked = selectedTop5Kw === kw.keyword;
+    const accentColor = isChecked ? 'var(--green)' : (kw.rank <= 3 ? 'var(--gray-2)' : 'var(--gray-5)');
     const accentH = viewMode === 'compact' ? '22px' : '28px';
 
     const badges = [
@@ -1075,8 +1107,8 @@ function drawDetailChart(idx, kw) {
       labels,
       datasets: [{
         data: raw,
-        borderColor: '#03C75A',
-        backgroundColor: 'rgba(3,199,90,0.08)',
+        borderColor: '#2DB400',
+        backgroundColor: 'rgba(45,180,0,0.08)',
         borderWidth: 2,
         pointRadius: 0,
         pointHoverRadius: 4,
@@ -1155,6 +1187,8 @@ function buildLegend(kws) {
 function selectTop5Kw(keyword) {
   selectedTop5Kw = selectedTop5Kw === keyword ? null : keyword;
   buildLegend(globalKws);
+  const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
+  drawChart(activeDays);
 }
 
 
@@ -1186,18 +1220,28 @@ function drawChart(days) {
     const maxV = Math.max(...raw, 1);
     const minV = Math.min(...raw);
     const range = maxV - minV || 1;
-    const isFirst = i === 0;
+
+    // 선택된 키워드는 초록, 나머지는 회색
+    // 아무것도 선택 안 했으면 1위만 초록
+    const isSelected = selectedTop5Kw
+      ? kw.keyword === selectedTop5Kw
+      : i === 0;
+    const lineColor = isSelected ? '#2DB400' : '#CCCCCC';
+    const lineWidth = isSelected ? 2.5 : 1.2;
+    const fillColor = isSelected ? 'rgba(45,180,0,0.08)' : 'transparent';
+
     return {
       label: kw.keyword,
       data: raw.map(v => Math.round(((v - minV) / range) * 100)),
-      borderColor: '#03C75A',
-      backgroundColor: isFirst ? 'rgba(3,199,90,0.08)' : 'transparent',
-      borderWidth: isFirst ? 2.5 : 1.5,
-      pointRadius: isFirst ? 2 : 0,
+      borderColor: lineColor,
+      backgroundColor: fillColor,
+      borderWidth: lineWidth,
+      pointRadius: isSelected ? 2 : 0,
       pointHoverRadius: 4,
-      borderDash: i === 0 ? [] : [5, 3],
+      borderDash: isSelected ? [] : [4, 3],
       tension: 0.4,
-      fill: isFirst,
+      fill: isSelected,
+      order: isSelected ? 0 : 1, // 선택된 것이 앞에 그려짐
     };
   });
 
