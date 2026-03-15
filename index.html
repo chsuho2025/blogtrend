@@ -10,17 +10,20 @@
     :root {
       --green: #03C75A;
       --green-dim: #E8F9F0;
+      --green-dark: #029A46;
       --black: #111111;
-      --gray-1: #333333;
-      --gray-2: #555555;
-      --gray-3: #888888;
-      --gray-4: #BBBBBB;
-      --gray-5: #E4E4E4;
-      --gray-6: #F5F5F5;
+      --gray-1: #222222;
+      --gray-2: #444444;
+      --gray-3: #777777;
+      --gray-4: #AAAAAA;
+      --gray-5: #DEDEDE;
+      --gray-6: #F4F4F4;
       --white: #FFFFFF;
-      --border: #EBEBEB;
-      --shadow-sm: 0 1px 4px rgba(0,0,0,0.06);
-      --radius: 12px;
+      --border: #E8E8E8;
+      --shadow-sm: 0 1px 4px rgba(0,0,0,0.05);
+      --shadow: 0 2px 12px rgba(0,0,0,0.07);
+      --radius: 14px;
+      --radius-sm: 8px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -44,25 +47,29 @@
     }
     .logo { display: flex; align-items: center; gap: 10px; }
     .logo-icon {
-      width: 26px; height: 26px; background: var(--black);
-      border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 13px;
+      width: 28px; height: 28px; background: var(--black);
+      border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 14px;
     }
-    .logo-name { font-size: 15px; font-weight: 700; letter-spacing: -0.4px; }
+    .logo-name { font-size: 15px; font-weight: 800; letter-spacing: -0.5px; color: var(--black); }
     .logo-badge {
-      font-size: 10px; font-weight: 600; color: var(--green);
-      background: var(--green-dim); padding: 2px 7px; border-radius: 20px;
+      font-size: 10px; font-weight: 700; color: var(--green);
+      background: var(--green-dim); padding: 2px 7px; border-radius: 20px; letter-spacing: 0.3px;
     }
     .header-right { display: flex; align-items: center; gap: 16px; }
-    .update-info { font-size: 12px; color: var(--gray-3); display: flex; align-items: center; gap: 6px; }
+    .update-status {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--gray-3);
+    }
     .live-dot {
       width: 6px; height: 6px; background: var(--green);
       border-radius: 50%; animation: pulse 2s infinite; flex-shrink: 0;
     }
     @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    .next-update { font-size: 11px; color: var(--gray-4); }
     .refresh-btn {
       height: 32px; padding: 0 14px; background: var(--white);
-      border: 1px solid var(--border); border-radius: 8px;
-      font-size: 13px; font-weight: 500; color: var(--gray-2);
+      border: 1px solid var(--border); border-radius: var(--radius-sm);
+      font-size: 12px; font-weight: 600; color: var(--gray-2);
       cursor: pointer; font-family: 'Pretendard', sans-serif;
       transition: all .15s; display: flex; align-items: center; gap: 5px;
     }
@@ -70,6 +77,23 @@
     .refresh-btn.loading { opacity: .4; pointer-events: none; }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spin { animation: spin .7s linear infinite; display: inline-block; }
+
+    /* ── 갱신 배너 ── */
+    .refresh-banner {
+      display: none; position: fixed; top: 64px; left: 50%; transform: translateX(-50%);
+      background: var(--black); color: var(--white); padding: 10px 20px;
+      border-radius: 24px; font-size: 13px; font-weight: 600;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.2); z-index: 200;
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+      animation: slideDown .3s ease;
+    }
+    .refresh-banner.show { display: flex; }
+    @keyframes slideDown { from{opacity:0;transform:translateX(-50%) translateY(-8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+    .banner-apply {
+      background: var(--green); color: var(--white); border: none;
+      padding: 4px 10px; border-radius: 12px; font-size: 11px; font-weight: 700;
+      cursor: pointer; font-family: 'Pretendard', sans-serif;
+    }
 
     /* ── TICKER ── */
     .ticker-bar { background: var(--white); border-bottom: 1px solid var(--border); }
@@ -79,19 +103,20 @@
     }
     .ticker-inner::-webkit-scrollbar { display: none; }
     .ticker-item {
-      padding: 9px 28px 9px 0; margin-right: 28px;
+      padding: 9px 24px 9px 0; margin-right: 24px;
       display: flex; align-items: center; gap: 8px;
       white-space: nowrap; border-right: 1px solid var(--border); font-size: 12px;
     }
     .ticker-item:last-child { border-right: none; }
-    .ticker-label { color: var(--gray-3); }
+    .ticker-label { color: var(--gray-3); font-weight: 500; }
     .ticker-val { font-weight: 700; color: var(--black); font-variant-numeric: tabular-nums; }
     .ticker-val.up { color: var(--green); }
+    .ticker-val.early { color: var(--green-dark); font-size: 11px; }
 
     /* ── LAYOUT ── */
     .main-wrap {
-      max-width: 1160px; margin: 0 auto; padding: 24px;
-      display: grid; grid-template-columns: 1fr 340px; gap: 20px; align-items: start;
+      max-width: 1160px; margin: 0 auto; padding: 20px 24px;
+      display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start;
     }
     .left-col { display: flex; flex-direction: column; gap: 16px; }
 
@@ -101,218 +126,310 @@
       border-radius: var(--radius); box-shadow: var(--shadow-sm); overflow: hidden;
     }
     .card-header {
-      padding: 20px 20px 16px; display: flex;
+      padding: 18px 20px 14px; display: flex;
       align-items: flex-start; justify-content: space-between;
       border-bottom: 1px solid var(--gray-6);
     }
-    .card-title { font-size: 15px; font-weight: 700; letter-spacing: -0.3px; }
-    .card-sub { font-size: 12px; color: var(--gray-3); margin-top: 3px; }
+    .card-title { font-size: 15px; font-weight: 800; color: var(--black); letter-spacing: -0.4px; }
+    .card-sub { font-size: 12px; color: var(--gray-3); margin-top: 2px; font-weight: 400; }
 
     /* ── TABS ── */
-    .tab-group { display: flex; gap: 1px; }
+    .tab-group {
+      display: flex; background: var(--gray-6);
+      border-radius: 8px; padding: 2px; gap: 1px;
+    }
     .tab-btn {
-      padding: 5px 12px; border-radius: 6px; font-size: 12px; font-weight: 500;
-      cursor: pointer; color: var(--gray-3); background: var(--gray-6); border: none;
+      padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 500;
+      cursor: pointer; color: var(--gray-3); background: none; border: none;
       font-family: 'Pretendard', sans-serif; transition: all .15s;
     }
     .tab-btn:hover { color: var(--black); }
-    .tab-btn.active { background: var(--white); color: var(--black); font-weight: 700; box-shadow: var(--shadow-sm); border: 1px solid var(--border); }
+    .tab-btn.active {
+      background: var(--white); color: var(--black); font-weight: 700;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
+    /* ── CATEGORY TABS ── */
+    .cat-tabs {
+      display: flex; gap: 4px; padding: 12px 20px 0; flex-wrap: nowrap; overflow-x: auto;
+      scrollbar-width: none;
+    }
+    .cat-tabs::-webkit-scrollbar { display: none; }
+    .cat-tab {
+      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      cursor: pointer; color: var(--gray-3); background: var(--gray-6);
+      border: 1.5px solid transparent; white-space: nowrap;
+      font-family: 'Pretendard', sans-serif; transition: all .15s; flex-shrink: 0;
+    }
+    .cat-tab:hover { color: var(--black); }
+    .cat-tab.active { background: var(--green-dim); color: var(--green-dark); border-color: var(--green); font-weight: 700; }
+    .cat-tab:disabled { opacity: .4; cursor: not-allowed; }
 
     /* ── CHART ── */
-    .chart-section { padding: 20px 20px 8px; }
-    .chart-wrap { height: 280px; position: relative; margin-bottom: 12px; }
-
-    /* 체크박스 범례 */
+    .chart-section { padding: 16px 20px 8px; }
+    .chart-wrap { height: 260px; position: relative; margin-bottom: 10px; }
     .chart-legend {
-      display: flex; flex-wrap: wrap; gap: 8px;
-      padding: 0 4px 12px;
+      display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 12px;
     }
     .legend-item {
-      display: flex; align-items: center; gap: 6px;
-      padding: 5px 10px; border-radius: 20px;
+      display: flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px;
       border: 1.5px solid var(--gray-5); cursor: pointer;
       font-size: 12px; font-weight: 500; color: var(--gray-3);
-      transition: all .15s; user-select: none;
-      background: var(--white);
+      transition: all .15s; user-select: none; background: var(--white);
     }
     .legend-item.active { border-color: var(--green); color: var(--black); background: var(--green-dim); }
-    .legend-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: var(--gray-5); flex-shrink: 0; transition: background .15s;
-    }
+    .legend-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray-5); flex-shrink: 0; }
     .legend-item.active .legend-dot { background: var(--green); }
 
     /* 히스토리 탭 */
-    .history-tabs {
-      display: flex; gap: 4px; flex-wrap: wrap; padding: 12px 20px 0;
-      border-top: 1px solid var(--gray-6);
+    .history-row {
+      display: flex; align-items: center; gap: 4px;
+      padding: 8px 20px 12px; border-top: 1px solid var(--gray-6);
+      overflow-x: auto; scrollbar-width: none;
     }
+    .history-row::-webkit-scrollbar { display: none; }
     .history-tab {
-      padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500;
+      padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 500;
       cursor: pointer; color: var(--gray-3); background: var(--gray-6);
-      border: none; font-family: 'Pretendard', sans-serif; transition: all .15s;
+      border: none; white-space: nowrap;
+      font-family: 'Pretendard', sans-serif; transition: all .15s; flex-shrink: 0;
     }
-    .history-tab:hover { color: var(--black); }
     .history-tab.active { background: var(--black); color: var(--white); font-weight: 700; }
+    .history-more {
+      font-size: 11px; color: var(--green); font-weight: 600;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0; padding: 3px 4px;
+    }
+
+    /* ── VIEW TOGGLE ── */
+    .view-toggle {
+      display: flex; background: var(--gray-6); border-radius: 7px; padding: 2px;
+    }
+    .view-btn {
+      padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600;
+      cursor: pointer; color: var(--gray-3); background: none; border: none;
+      font-family: 'Pretendard', sans-serif; transition: all .15s;
+    }
+    .view-btn.active { background: var(--white); color: var(--black); box-shadow: 0 1px 3px rgba(0,0,0,.07); }
 
     /* ── RANK TABLE ── */
-    .rank-table-header {
-      display: grid; grid-template-columns: 44px 1fr 90px 80px 72px;
-      padding: 8px 20px; font-size: 11px; color: var(--gray-4);
-      font-weight: 600; letter-spacing: 0.2px; text-transform: uppercase;
+    .rank-header-row {
+      display: grid; grid-template-columns: 40px 1fr 80px 72px;
+      padding: 8px 20px; font-size: 10px; color: var(--gray-4);
+      font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
+      border-bottom: 1px solid var(--gray-6);
     }
-    .rank-table-header span:not(:first-child) { text-align: right; }
+    .rank-header-row span:not(:first-child):not(:nth-child(2)) { text-align: right; }
 
     .rank-item-wrap { border-top: 1px solid var(--gray-6); }
     .rank-item-wrap:first-child { border-top: none; }
 
+    /* 컴팩트 뷰 */
     .rank-row {
-      display: grid; grid-template-columns: 44px 1fr 90px 80px 72px;
-      padding: 13px 20px; align-items: center; cursor: pointer; transition: background .1s;
+      display: grid; grid-template-columns: 40px 1fr 80px 72px;
+      padding: 11px 20px; align-items: center; cursor: pointer; transition: background .1s;
     }
     .rank-row:hover { background: var(--gray-6); }
-    .rank-row.active { background: #F0FDF6; }
+    .rank-row.open { background: #F0FDF6; }
 
-    .rank-num {
-      font-size: 14px; font-weight: 700; color: var(--gray-4); font-variant-numeric: tabular-nums;
+    /* 상세 뷰 */
+    .rank-row.detail-view {
+      grid-template-columns: 40px 1fr 80px;
+      padding: 14px 20px;
     }
-    .rank-num.top1 { color: var(--black); font-size: 16px; }
-    .rank-num.top2 { color: var(--gray-2); }
+
+    .rank-num-wrap { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; }
+    .rank-num {
+      font-size: 15px; font-weight: 800; color: var(--gray-4);
+      font-variant-numeric: tabular-nums; line-height: 1;
+    }
+    .rank-num.top1 { color: var(--black); font-size: 17px; }
+    .rank-num.top2 { color: var(--gray-2); font-size: 16px; }
     .rank-num.top3 { color: var(--gray-3); }
 
-    .rank-keyword { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .rank-accent { width: 3px; height: 24px; border-radius: 2px; flex-shrink: 0; }
-    .keyword-inner { min-width: 0; }
-    .keyword-name {
-      font-size: 14px; font-weight: 600; color: var(--black);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.2px;
+    .rank-delta { font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .rank-delta.up { color: var(--green); }
+    .rank-delta.down { color: var(--gray-4); }
+    .rank-delta.flat { color: var(--gray-4); }
+    .rank-delta.new-kw { color: var(--green); }
+
+    .rank-kw-col { display: flex; align-items: center; gap: 9px; min-width: 0; }
+    .rank-accent { width: 3px; border-radius: 2px; flex-shrink: 0; }
+    .kw-inner { min-width: 0; flex: 1; }
+    .kw-name {
+      font-size: 14px; font-weight: 700; color: var(--black);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.3px;
     }
-    .keyword-comment {
-      font-size: 11px; color: var(--gray-3); margin-top: 2px;
+    .kw-comment {
+      font-size: 11px; color: var(--gray-3); margin-top: 1px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .keyword-badges { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+    .kw-badges { display: flex; gap: 4px; margin-top: 3px; flex-wrap: wrap; }
+
     .badge {
-      display: inline-flex; align-items: center; font-size: 10px; font-weight: 600;
-      padding: 2px 6px; border-radius: 4px; letter-spacing: .1px; flex-shrink: 0;
+      display: inline-flex; align-items: center; font-size: 10px; font-weight: 700;
+      padding: 2px 6px; border-radius: 4px; flex-shrink: 0;
     }
-    .badge-hot  { color: #D03030; background: #FFF0F0; }
-    .badge-up   { color: var(--green); background: var(--green-dim); }
-    .badge-down { color: var(--gray-4); background: var(--gray-6); }
+    .badge-early { color: var(--green-dark); background: var(--green-dim); }
+    .badge-hot   { color: #C62828; background: #FFEBEE; }
+    .badge-up    { color: var(--green); background: var(--green-dim); }
+    .badge-down  { color: var(--gray-4); background: var(--gray-6); }
 
-    .rank-rate {
-      text-align: right; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums;
+    .rank-rate-col {
+      text-align: right; font-size: 13px; font-weight: 700;
+      font-variant-numeric: tabular-nums;
     }
-    .rank-rate.up   { color: var(--black); }
-    .rank-rate.down { color: var(--gray-4); }
-    .rank-rate.flat { color: var(--gray-4); font-weight: 500; }
+    .rank-rate-col.up { color: var(--black); }
+    .rank-rate-col.down { color: var(--gray-4); }
+    .rank-rate-col.flat { color: var(--gray-4); font-weight: 500; }
 
-    .rank-post {
-      text-align: right; font-size: 12px; color: var(--gray-3); font-variant-numeric: tabular-nums;
+    .rank-blog-col {
+      text-align: right; font-size: 12px; font-weight: 600;
+      font-variant-numeric: tabular-nums; color: var(--gray-3);
     }
+    .rank-blog-col.up { color: var(--green); }
 
-    .rank-bar-wrap { display: flex; justify-content: flex-end; align-items: center; }
-    .rank-bar-track { width: 52px; height: 3px; background: var(--gray-5); border-radius: 2px; overflow: hidden; }
-    .rank-bar-fill { height: 100%; border-radius: 2px; transition: width 1s ease; }
+    /* 스파크라인 */
+    .sparkline-col { display: flex; justify-content: flex-end; align-items: center; }
+    .sparkline-col svg { display: block; }
 
-    /* ── POSTS PANEL ── */
-    .posts-panel {
+    /* ── 상세 패널 ── */
+    .detail-panel {
       display: none; flex-direction: column;
       background: #FAFAFA; border-top: 1px solid var(--gray-6);
     }
-    .posts-panel.open { display: flex; }
+    .detail-panel.open { display: flex; }
+
+    .detail-chart-wrap {
+      padding: 16px 20px 8px 20px; height: 160px;
+    }
+    .detail-stats {
+      display: grid; grid-template-columns: 1fr 1fr 1fr;
+      padding: 0 20px 14px; gap: 12px;
+    }
+    .detail-stat { display: flex; flex-direction: column; gap: 2px; }
+    .detail-stat-label { font-size: 10px; color: var(--gray-4); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
+    .detail-stat-val { font-size: 16px; font-weight: 800; color: var(--black); font-variant-numeric: tabular-nums; letter-spacing: -0.4px; }
+    .detail-stat-val.up { color: var(--green); }
+    .detail-stat-val.gray { color: var(--gray-3); }
+
     .post-item {
-      display: flex; flex-direction: column; gap: 3px;
-      padding: 12px 20px 12px 57px; border-bottom: 1px solid var(--gray-6);
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 11px 20px 11px 52px; border-top: 1px solid var(--gray-6);
       text-decoration: none; transition: background .1s;
     }
-    .post-item:last-child { border-bottom: none; }
     .post-item:hover { background: #F0FDF6; }
     .post-title {
       font-size: 13px; font-weight: 600; color: var(--black);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
-    .post-desc {
-      font-size: 11px; color: var(--gray-3);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
+    .post-desc { font-size: 11px; color: var(--gray-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .post-meta { font-size: 11px; color: var(--gray-4); margin-top: 1px; }
-    .posts-msg { padding: 14px 20px 14px 57px; font-size: 12px; color: var(--gray-3); }
+    .panel-msg { padding: 14px 20px 14px 52px; font-size: 12px; color: var(--gray-3); }
 
-    /* ── EMPTY ── */
+    /* ── 하단 empty ── */
     .empty-end {
-      padding: 20px; text-align: center;
-      border-top: 1px dashed var(--gray-5);
+      padding: 20px; text-align: center; border-top: 1px dashed var(--gray-5);
     }
-    .empty-end-title { font-size: 13px; color: var(--gray-3); }
+    .empty-end-title { font-size: 13px; color: var(--gray-3); font-weight: 600; }
     .empty-end-desc  { font-size: 11px; color: var(--gray-4); margin-top: 4px; }
+
+    /* ── LOADING / ERROR ── */
     .state-wrap {
       display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: 80px; gap: 12px;
+      justify-content: center; padding: 72px; gap: 12px;
     }
     .loading-ring {
-      width: 24px; height: 24px; border: 2px solid var(--gray-5);
+      width: 22px; height: 22px; border: 2px solid var(--gray-5);
       border-top-color: var(--black); border-radius: 50%; animation: spin .7s linear infinite;
     }
     .state-text { font-size: 13px; color: var(--gray-3); }
-    .empty-state {
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; padding: 56px 20px; gap: 10px;
-    }
-    .empty-icon  { font-size: 28px; }
-    .empty-title { font-size: 15px; font-weight: 700; color: var(--gray-2); letter-spacing: -0.3px; }
-    .empty-desc  { font-size: 13px; color: var(--gray-3); }
 
     /* ── SIDEBAR ── */
-    .sidebar { display: flex; flex-direction: column; gap: 16px; }
+    .sidebar { display: flex; flex-direction: column; gap: 14px; }
 
+    /* Early Trend 카드 */
+    .early-card {
+      background: linear-gradient(135deg, #F0FDF6 0%, #E8F9F0 100%);
+      border: 1px solid #B8EDD0; border-radius: var(--radius);
+      box-shadow: var(--shadow-sm); overflow: hidden;
+    }
+    .early-card .card-header { background: transparent; border-bottom-color: #C8F0DA; }
+    .early-card .card-title { color: var(--green-dark); }
+    .early-card .card-sub { color: #52A875; }
+
+    .early-item {
+      display: flex; align-items: center; padding: 12px 20px; gap: 12px;
+      border-top: 1px solid #D0F0E0; transition: background .1s;
+    }
+    .early-item:first-child { border-top: none; }
+    .early-item:hover { background: rgba(3,199,90,0.06); }
+    .early-rank { font-size: 13px; font-weight: 800; color: var(--green); width: 18px; text-align: center; flex-shrink: 0; }
+    .early-info { flex: 1; min-width: 0; }
+    .early-kw { font-size: 14px; font-weight: 700; color: var(--black); letter-spacing: -0.2px; }
+    .early-meta { font-size: 11px; color: #52A875; margin-top: 2px; }
+    .early-score {
+      font-size: 12px; font-weight: 700; color: var(--green-dark);
+      background: rgba(3,199,90,0.12); padding: 3px 8px; border-radius: 12px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .early-empty { padding: 20px; text-align: center; }
+    .early-empty-icon { font-size: 24px; margin-bottom: 6px; }
+    .early-empty-text { font-size: 12px; color: #52A875; }
+
+    /* TOP5 */
     .top5-item {
-      display: flex; align-items: center; padding: 13px 20px; gap: 14px;
+      display: flex; align-items: center; padding: 12px 20px; gap: 12px;
       border-top: 1px solid var(--gray-6); transition: background .1s;
     }
     .top5-item:first-child { border-top: none; }
     .top5-item:hover { background: var(--gray-6); }
-    .top5-rank { font-size: 14px; font-weight: 800; color: var(--gray-4); width: 20px; text-align: center; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .top5-rank { font-size: 14px; font-weight: 800; color: var(--gray-4); width: 18px; text-align: center; flex-shrink: 0; }
     .top5-rank.r1 { color: var(--black); font-size: 16px; }
     .top5-rank.r2 { color: var(--gray-2); }
     .top5-rank.r3 { color: var(--gray-3); }
     .top5-info { flex: 1; min-width: 0; }
-    .top5-keyword { font-size: 14px; font-weight: 600; letter-spacing: -0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .top5-kw { font-size: 14px; font-weight: 700; color: var(--black); letter-spacing: -0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .top5-meta { font-size: 11px; color: var(--gray-3); margin-top: 2px; }
     .top5-rate { font-size: 13px; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; flex-shrink: 0; }
     .top5-rate.neg { color: var(--gray-4); }
 
+    /* Rising */
     .rising-item {
       display: flex; align-items: center; justify-content: space-between;
-      padding: 11px 20px; border-top: 1px solid var(--gray-6); transition: background .1s;
+      padding: 10px 20px; border-top: 1px solid var(--gray-6); transition: background .1s;
     }
     .rising-item:first-child { border-top: none; }
     .rising-item:hover { background: var(--gray-6); }
     .rising-left { display: flex; align-items: center; gap: 10px; }
-    .rising-num  { font-size: 11px; font-weight: 700; color: var(--gray-4); width: 14px; }
-    .rising-kw   { font-size: 13px; font-weight: 600; }
+    .rising-num { font-size: 11px; font-weight: 700; color: var(--gray-4); width: 14px; }
+    .rising-kw { font-size: 13px; font-weight: 600; color: var(--black); }
     .rising-rate { font-size: 12px; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; }
 
+    /* Stats */
     .stats-grid { display: grid; grid-template-columns: 1fr 1fr; }
-    .stat-cell { padding: 16px 20px; border-top: 1px solid var(--gray-6); border-right: 1px solid var(--gray-6); }
+    .stat-cell { padding: 14px 18px; border-top: 1px solid var(--gray-6); border-right: 1px solid var(--gray-6); }
     .stat-cell:nth-child(even) { border-right: none; }
-    .stat-cell:nth-child(-n+2)  { border-top: none; }
-    .stat-label { font-size: 11px; color: var(--gray-3); font-weight: 500; margin-bottom: 6px; }
-    .stat-val { font-size: 20px; font-weight: 800; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
+    .stat-cell:nth-child(-n+2) { border-top: none; }
+    .stat-label { font-size: 10px; color: var(--gray-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 5px; }
+    .stat-val { font-size: 19px; font-weight: 800; color: var(--black); letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
     .stat-val.green { color: var(--green); }
-    .stat-val.sm { font-size: 15px; }
-    .stat-sub { font-size: 11px; color: var(--gray-3); margin-top: 2px; }
+    .stat-val.sm { font-size: 14px; }
+    .stat-sub { font-size: 10px; color: var(--gray-3); margin-top: 2px; }
 
-    footer { max-width: 1160px; margin: 0 auto; padding: 20px 24px 40px; display: flex; align-items: center; justify-content: space-between; }
-    .footer-left { font-size: 12px; color: var(--gray-4); }
-    .footer-tags { display: flex; gap: 6px; }
-    .footer-tag { font-size: 11px; color: var(--gray-3); background: var(--white); border: 1px solid var(--border); padding: 3px 9px; border-radius: 20px; }
+    /* ── FOOTER ── */
+    footer { max-width: 1160px; margin: 0 auto; padding: 16px 24px 36px; display: flex; align-items: center; justify-content: space-between; }
+    .footer-left { font-size: 11px; color: var(--gray-4); }
+    .footer-tags { display: flex; gap: 5px; }
+    .footer-tag { font-size: 10px; color: var(--gray-3); background: var(--white); border: 1px solid var(--border); padding: 2px 8px; border-radius: 20px; }
 
+    /* ── RESPONSIVE ── */
     @media (max-width: 900px) {
       .main-wrap { grid-template-columns: 1fr; }
       .sidebar { display: none; }
-      .rank-table-header, .rank-row { grid-template-columns: 40px 1fr 80px 72px; }
-      .rank-table-header span:nth-child(4), .rank-post { display: none; }
+      .rank-header-row, .rank-row { grid-template-columns: 40px 1fr 80px 72px; }
+      .rank-blog-col { display: none; }
+      .rank-row.detail-view { grid-template-columns: 40px 1fr 80px; }
     }
   </style>
 </head>
@@ -326,9 +443,10 @@
       <span class="logo-badge">BETA</span>
     </div>
     <div class="header-right">
-      <div class="update-info">
+      <div class="update-status">
         <div class="live-dot"></div>
-        <span id="updateTime">로딩 중</span>
+        <span id="rankTime">로딩 중</span>
+        <span class="next-update" id="nextUpdate"></span>
       </div>
       <button class="refresh-btn" id="refreshBtn" onclick="manualRefresh()">
         <span id="refreshIcon">↻</span> 새로고침
@@ -339,11 +457,18 @@
 
 <div class="ticker-bar">
   <div class="ticker-inner">
-    <div class="ticker-item"><span class="ticker-label">1위 키워드</span><span class="ticker-val" id="tick-top1">—</span></div>
+    <div class="ticker-item"><span class="ticker-label">1위</span><span class="ticker-val" id="tick-top1">—</span></div>
     <div class="ticker-item"><span class="ticker-label">최고 상승률</span><span class="ticker-val up" id="tick-rate">—</span></div>
+    <div class="ticker-item"><span class="ticker-label">🚀 조기감지</span><span class="ticker-val early" id="tick-early">—</span></div>
     <div class="ticker-item"><span class="ticker-label">분석 키워드</span><span class="ticker-val" id="tick-count">—</span></div>
-    <div class="ticker-item"><span class="ticker-label">업데이트</span><span class="ticker-val" id="tick-time">—</span></div>
+    <div class="ticker-item"><span class="ticker-label">수집</span><span class="ticker-val" id="tick-collect">—</span></div>
   </div>
+</div>
+
+<!-- 갱신 배너 -->
+<div class="refresh-banner" id="refreshBanner" onclick="applyNewData()">
+  🔄 <span id="bannerText">새로운 데이터가 있어요</span>
+  <button class="banner-apply">적용</button>
 </div>
 
 <div class="main-wrap">
@@ -355,21 +480,37 @@
   </div>
 
   <div class="sidebar" id="sidebar" style="display:none;">
+    <!-- Early Trend -->
+    <div class="early-card" id="earlyCard">
+      <div class="card-header">
+        <div>
+          <div class="card-title">🚀 조기 감지</div>
+          <div class="card-sub">검색 폭발 전 시그널</div>
+        </div>
+      </div>
+      <div id="earlyList"></div>
+    </div>
+
+    <!-- TOP5 -->
     <div class="card">
       <div class="card-header"><div><div class="card-title">TOP 5</div><div class="card-sub">실시간 인기 키워드</div></div></div>
       <div id="top5List"></div>
     </div>
+
+    <!-- Rising -->
     <div class="card">
       <div class="card-header"><div><div class="card-title">급상승</div><div class="card-sub">최근 3일 기준</div></div></div>
       <div id="risingList" style="padding:4px 0;"></div>
     </div>
+
+    <!-- Stats -->
     <div class="card">
       <div class="card-header"><div class="card-title">현황</div></div>
       <div class="stats-grid">
         <div class="stat-cell"><div class="stat-label">분석 키워드</div><div class="stat-val" id="stat-count">—</div><div class="stat-sub">개</div></div>
         <div class="stat-cell"><div class="stat-label">최고 상승률</div><div class="stat-val green" id="stat-rate">—</div><div class="stat-sub">%</div></div>
         <div class="stat-cell"><div class="stat-label">1위 키워드</div><div class="stat-val sm" id="stat-top">—</div><div class="stat-sub">현재 1위</div></div>
-        <div class="stat-cell"><div class="stat-label">업데이트</div><div class="stat-val sm" id="stat-time">—</div><div class="stat-sub">마지막 갱신</div></div>
+        <div class="stat-cell"><div class="stat-label">조기감지</div><div class="stat-val sm green" id="stat-early">—</div><div class="stat-sub">개</div></div>
       </div>
     </div>
   </div>
@@ -385,27 +526,168 @@
 </footer>
 
 <script>
+// ── 전역 상태 ──
 let chartInstance = null;
+let detailChartInstance = null;
 let globalKws = [];
 let globalHistory = [];
-let activeHistoryIdx = -1; // -1 = 현재
+let globalData = null;
+let pendingData = null;
+let activeHistoryIdx = -1;
 let checkedSet = new Set();
+let viewMode = localStorage.getItem('btr_viewMode') || 'compact';
+let activeCat = 'all';
+let shownEarlyTrends = new Set();
 
-// ── DATA LOAD ──
+// ── 스파크라인 SVG ──
+function sparkline(values, width=72, height=28, isChecked=false) {
+  if (!values || values.length < 2) {
+    return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+      <line x1="0" y1="${height/2}" x2="${width}" y2="${height/2}" stroke="#E8E8E8" stroke-width="1.5" stroke-dasharray="3,3"/>
+    </svg>`;
+  }
+  const pts = values.slice(-14);
+  const max = Math.max(...pts, 0.01);
+  const min = Math.min(...pts);
+  const range = max - min || 0.01;
+  const coords = pts.map((v, i) => {
+    const x = (i / (pts.length - 1)) * (width - 2) + 1;
+    const y = height - 3 - ((v - min) / range) * (height - 6);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+
+  // 채우기 영역용 path
+  const fillPath = `M${coords[0]} ` + coords.slice(1).map(c => `L${c}`).join(' ')
+    + ` L${coords[coords.length-1].split(',')[0]},${height-1} L1,${height-1} Z`;
+  const linePath = `M${coords[0]} ` + coords.slice(1).map(c => `L${c}`).join(' ');
+
+  const isUp = pts[pts.length-1] >= pts[0];
+  const color = isChecked ? '#03C75A' : (isUp ? '#AAAAAA' : '#CCCCCC');
+  const fillColor = isChecked
+    ? 'rgba(3,199,90,0.10)'
+    : (isUp ? 'rgba(170,170,170,0.08)' : 'rgba(200,200,200,0.05)');
+
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+    <path d="${fillPath}" fill="${fillColor}" stroke="none"/>
+    <path d="${linePath}" fill="none" stroke="${color}" stroke-width="${isChecked ? 2 : 1.5}" stroke-linejoin="round" stroke-linecap="round"/>
+  </svg>`;
+}
+
+// ── 순위 변동 텍스트 ──
+function deltaHtml(rank, prevRank, isNew) {
+  if (isNew || !prevRank) return '<span class="rank-delta new-kw">NEW</span>';
+  const delta = prevRank - rank;
+  if (Math.abs(delta) <= 1) return '<span class="rank-delta flat">━</span>';
+  if (delta > 0) return `<span class="rank-delta up">▲${delta}</span>`;
+  return `<span class="rank-delta down">▼${Math.abs(delta)}</span>`;
+}
+
+// ── 변화율 텍스트 ──
+function rateHtml(rate) {
+  if (rate > 0) return `<div class="rank-rate-col up">+${rate}%</div>`;
+  if (rate < -5) return `<div class="rank-rate-col down">${rate}%</div>`;
+  return `<div class="rank-rate-col flat">보합</div>`;
+}
+
+// ── 시간 포맷 ──
+function fmt(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('ko-KR', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+}
+function fmtShort(iso) {
+  return new Date(iso).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
+}
+function fmtHistLabel(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const prefix = isToday ? '' : `${d.getMonth()+1}/${d.getDate()} `;
+  return `${prefix}${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+}
+
+// ── 다음 정각까지 시간 ──
+function msUntilNextHour() {
+  const now = new Date();
+  return (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000;
+}
+
+// ── 자동 갱신 스케줄 ──
+function scheduleAutoRefresh() {
+  const ms = msUntilNextHour();
+  const nextTime = new Date(Date.now() + ms);
+  document.getElementById('nextUpdate').textContent =
+    `· 다음 ${nextTime.getHours().toString().padStart(2,'0')}:00 업데이트`;
+
+  setTimeout(async () => {
+    try {
+      const res = await fetch('/api/data');
+      if (!res.ok) return;
+      const newData = await res.json();
+      // 열린 패널 없으면 바로 적용, 있으면 배너 표시
+      const hasOpenPanel = !!document.querySelector('.detail-panel.open');
+      if (!hasOpenPanel) {
+        renderAll(newData);
+      } else {
+        pendingData = newData;
+        const banner = document.getElementById('refreshBanner');
+        document.getElementById('bannerText').textContent = '새로운 데이터가 있어요';
+        banner.classList.add('show');
+        setTimeout(() => banner.classList.remove('show'), 6000);
+      }
+    } catch(e) {}
+    scheduleAutoRefresh();
+  }, ms);
+}
+
+function applyNewData() {
+  if (pendingData) {
+    // 열린 패널 키워드 기억
+    const openPanel = document.querySelector('.detail-panel.open');
+    const openKeyword = openPanel
+      ? openPanel.closest('.rank-item-wrap')?.querySelector('.kw-name')?.textContent
+      : null;
+
+    renderAll(pendingData);
+    pendingData = null;
+
+    // 같은 키워드 패널 다시 열기
+    if (openKeyword) {
+      const idx = globalKws.findIndex(k => k.keyword === openKeyword);
+      if (idx >= 0) {
+        const row = document.querySelector(`#panel-${idx}`)?.previousElementSibling;
+        if (row) setTimeout(() => toggleDetail(row, openKeyword, idx), 100);
+      }
+    }
+  }
+  document.getElementById('refreshBanner').classList.remove('show');
+}
+
+// ── 데이터 로드 ──
 async function loadData() {
   try {
     const res = await fetch('/api/data');
     if (!res.ok) throw new Error('no data');
     const data = await res.json();
     renderAll(data);
+    // 히스토리는 별도로 비동기 로드
+    loadHistory();
   } catch(e) {
     document.getElementById('leftCol').innerHTML = `
-      <div class="card"><div class="empty-state">
-        <div class="empty-icon">😶‍🌫️</div>
-        <div class="empty-title">데이터를 불러오지 못했어요</div>
-        <div class="empty-desc">잠시 후 다시 시도해 주세요</div>
+      <div class="card"><div class="state-wrap">
+        <div style="font-size:28px">😶‍🌫️</div>
+        <div class="state-text">데이터를 불러오지 못했어요</div>
       </div></div>`;
   }
+}
+
+async function loadHistory() {
+  try {
+    const res = await fetch('/api/data?detail=1');
+    if (!res.ok) return;
+    const data = await res.json();
+    globalHistory = data.history || [];
+    rebuildHistoryTabs();
+  } catch(e) {}
 }
 
 async function manualRefresh() {
@@ -417,29 +699,12 @@ async function manualRefresh() {
   finally { btn.classList.remove('loading'); icon.classList.remove('spin'); }
 }
 
-function fmt(iso) {
-  const d = new Date(iso);
-  return d.toLocaleString('ko-KR', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
-}
-function fmtShort(iso) {
-  return new Date(iso).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
-}
-function fmtHistLabel(iso) {
-  const d = new Date(iso);
-  return `${d.getMonth()+1}/${d.getDate()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
-}
-
-function rateTag(rate) {
-  if (rate > 0)  return `<span class="rank-rate up">+${rate}%</span>`;
-  if (rate < -5) return `<span class="rank-rate down">${rate}%</span>`;
-  return `<span class="rank-rate flat">보합</span>`;
-}
-
-// ── RENDER ALL ──
+// ── 메인 렌더 ──
 function renderAll(data) {
+  globalData = data;
   globalKws = data.keywords || [];
-  globalHistory = data.history || [];
-
+  const earlyTrends = data.earlyTrends || [];
+  const rising = data.rising || [];
   const maxRate = Math.max(...globalKws.map(k => k.changeRate), 0);
 
   // 기본 체크: 1위
@@ -447,30 +712,61 @@ function renderAll(data) {
     checkedSet.add(globalKws[0].keyword);
   }
 
-  // Header / Ticker
-  document.getElementById('updateTime').textContent = fmt(data.updatedAt) + ' 업데이트';
+  // Header
+  const rankTime = data.rankUpdatedAt || data.updatedAt;
+  document.getElementById('rankTime').textContent = fmt(rankTime) + ' 업데이트';
+
+  // Ticker
   document.getElementById('tick-top1').textContent = globalKws[0]?.keyword || '—';
   document.getElementById('tick-rate').textContent = maxRate > 0 ? `+${maxRate}%` : '—';
+  document.getElementById('tick-early').textContent = earlyTrends.length > 0
+    ? earlyTrends[0].keyword : '없음';
   document.getElementById('tick-count').textContent = globalKws.length ? globalKws.length + '개' : '—';
-  document.getElementById('tick-time').textContent = fmtShort(data.updatedAt);
+  document.getElementById('tick-collect').textContent = data.collectUpdatedAt
+    ? fmtShort(data.collectUpdatedAt) : '—';
 
-  // Sidebar
+  // Sidebar stats
   document.getElementById('stat-count').textContent = globalKws.length || '—';
   document.getElementById('stat-rate').textContent = maxRate || '—';
   document.getElementById('stat-top').textContent = globalKws[0]?.keyword || '—';
-  document.getElementById('stat-time').textContent = fmtShort(data.updatedAt);
+  document.getElementById('stat-early').textContent = earlyTrends.length || '0';
 
-  document.getElementById('top5List').innerHTML = globalKws.slice(0, 5).map((kw, i) => `
+  // Early Trend 사이드바
+  document.getElementById('earlyList').innerHTML = earlyTrends.length === 0
+    ? `<div class="early-empty">
+        <div class="early-empty-icon">🔍</div>
+        <div class="early-empty-text">현재 감지된 조기 트렌드가 없어요</div>
+      </div>`
+    : earlyTrends.map((kw, i) => `
+        <div class="early-item">
+          <div class="early-rank">${i+1}</div>
+          <div class="early-info">
+            <div class="early-kw">${kw.keyword}</div>
+            <div class="early-meta">3일 +${kw.risingRate}% · 블로그 ${kw.blogGrowth > 0 ? '+' : ''}${kw.blogGrowth}%</div>
+          </div>
+          <div class="early-score">폭발예감</div>
+        </div>`).join('');
+
+  // Early Trend 배너 (새로운 것만)
+  earlyTrends.forEach(kw => {
+    if (!shownEarlyTrends.has(kw.keyword)) {
+      shownEarlyTrends.add(kw.keyword);
+      // 첫 로드는 배너 안 띄움
+    }
+  });
+
+  // TOP5
+  document.getElementById('top5List').innerHTML = globalKws.slice(0,5).map((kw,i) => `
     <div class="top5-item">
       <div class="top5-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${kw.rank}</div>
       <div class="top5-info">
-        <div class="top5-keyword">${kw.keyword}</div>
+        <div class="top5-kw">${kw.keyword}</div>
         <div class="top5-meta">${kw.comment || '트렌딩 키워드'}</div>
       </div>
       <div class="top5-rate ${kw.changeRate<=0?'neg':''}">${kw.changeRate>0?'+':''}${kw.changeRate}%</div>
-    </div>`).join('') || '<div style="padding:20px;color:var(--gray-3);font-size:13px;">키워드 없음</div>';
+    </div>`).join('');
 
-  const rising = data.rising || [];
+  // Rising
   document.getElementById('risingList').innerHTML = rising.slice(0,5).map((kw,i) => `
     <div class="rising-item">
       <div class="rising-left"><span class="rising-num">${i+1}</span><span class="rising-kw">${kw.keyword}</span></div>
@@ -482,10 +778,10 @@ function renderAll(data) {
   buildMainContent();
 }
 
-// ── MAIN CONTENT BUILD ──
+// ── 메인 콘텐츠 빌드 ──
 function buildMainContent() {
   const kws = globalKws;
-  const maxScore = kws[0]?.score || 1;
+  const hasCategory = kws.some(k => k.category);
 
   document.getElementById('leftCol').innerHTML = `
     <!-- 차트 카드 -->
@@ -505,13 +801,10 @@ function buildMainContent() {
         <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
         <div class="chart-legend" id="chartLegend"></div>
       </div>
-      ${globalHistory.length > 1 ? `
-      <div class="history-tabs" id="historyTabs">
+      <div class="history-row" id="historyRow">
         <button class="history-tab active" data-idx="-1">현재</button>
-        ${globalHistory.slice().reverse().slice(0,10).map((h,i) => `
-          <button class="history-tab" data-idx="${globalHistory.length-1-i}">${fmtHistLabel(h.timestamp)}</button>
-        `).join('')}
-      </div>` : ''}
+        <span class="history-more" id="historyMore" style="display:none" onclick="loadHistory()">더 보기</span>
+      </div>
     </div>
 
     <!-- 랭킹 카드 -->
@@ -521,64 +814,101 @@ function buildMainContent() {
           <div class="card-title">실시간 랭킹</div>
           <div class="card-sub">네이버 블로그 트렌드 TOP ${kws.length}</div>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <div class="view-toggle">
+            <button class="view-btn ${viewMode==='compact'?'active':''}" onclick="setViewMode('compact')">컴팩트</button>
+            <button class="view-btn ${viewMode==='detail'?'active':''}" onclick="setViewMode('detail')">상세</button>
+          </div>
+        </div>
       </div>
-      <div class="rank-table-header">
+      ${hasCategory ? `
+      <div class="cat-tabs" id="catTabs">
+        <button class="cat-tab active" data-cat="all">전체</button>
+        <button class="cat-tab" data-cat="FOOD">음식</button>
+        <button class="cat-tab" data-cat="BEAUTY">뷰티</button>
+        <button class="cat-tab" data-cat="FASHION">패션</button>
+        <button class="cat-tab" data-cat="TECH">테크</button>
+        <button class="cat-tab" data-cat="LIFE">라이프</button>
+      </div>` : ''}
+      <div class="rank-header-row">
         <span>순위</span><span>키워드</span>
-        <span style="text-align:right">주간 변화</span>
-        <span style="text-align:right">포스팅 수</span>
-        <span style="text-align:right">비중</span>
+        <span style="text-align:right">검색변화</span>
+        <span style="text-align:right">추세</span>
       </div>
-      <div id="rankList">${buildRankRows(kws, maxScore)}</div>
+      <div id="rankList">${buildRankRows(kws)}</div>
     </div>
   `;
 
   buildLegend(kws);
   drawChart(7);
   setupPeriodTabs();
-  if (globalHistory.length > 1) setupHistoryTabs();
+  if (hasCategory) setupCatTabs();
+  rebuildHistoryTabs();
 }
 
-// ── RANK ROWS ──
-function buildRankRows(kws, maxScore) {
-  if (!kws.length) return `<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-title">트렌드 데이터가 없어요</div></div>`;
+// ── 랭킹 행 빌드 ──
+function buildRankRows(kws) {
+  const filtered = activeCat === 'all' ? kws : kws.filter(k => k.category === activeCat);
+  if (!filtered.length) return `<div style="padding:40px;text-align:center;color:var(--gray-3);font-size:13px;">해당 카테고리 데이터가 없어요</div>`;
 
-  const rows = kws.map((kw, i) => {
-    const numCls = i===0?'top1':i===1?'top2':i===2?'top3':'';
+  const rows = filtered.map((kw, i) => {
+    const numCls = kw.rank===1?'top1':kw.rank===2?'top2':kw.rank===3?'top3':'';
     const isChecked = checkedSet.has(kw.keyword);
-    const accentColor = isChecked ? 'var(--green)' : (i < 3 ? 'var(--gray-3)' : 'var(--gray-5)');
-    const scoreW = Math.round((kw.score / maxScore) * 100);
-    const barColor = isChecked ? 'var(--green)' : 'var(--gray-4)';
-    const isHot = kw.risingRate >= 50;
+    const accentColor = isChecked ? 'var(--green)' : (kw.rank <= 3 ? 'var(--gray-3)' : 'var(--gray-5)');
+    const accentH = viewMode === 'compact' ? '22px' : '28px';
+
+    const badges = [
+      kw.isEarlyTrend ? '<span class="badge badge-early">🚀 조기감지</span>' : '',
+      kw.risingRate >= 80 ? '<span class="badge badge-hot">HOT</span>' : '',
+      kw.trend === '유행중' && !kw.isEarlyTrend ? '<span class="badge badge-up">유행중</span>' : '',
+      kw.trend === '유행지남' ? '<span class="badge badge-down">하락세</span>' : '',
+    ].filter(Boolean).join('');
+
+    const blogStr = kw.blogGrowth > 0 ? `+${kw.blogGrowth}%` : kw.blogGrowth < -5 ? `${kw.blogGrowth}%` : '—';
+    const blogCls = kw.blogGrowth > 0 ? 'up' : '';
+
+    const compact = `
+      <div class="rank-row${isChecked?' open':''}" onclick="toggleDetail(this, '${kw.keyword.replace(/'/g,"\\'")}', ${i})">
+        <div class="rank-num-wrap">
+          <div class="rank-num ${numCls}">${kw.rank}</div>
+          ${deltaHtml(kw.rank, kw.prevRank, kw.isNew)}
+        </div>
+        <div class="rank-kw-col">
+          <div class="rank-accent" style="background:${accentColor};height:${accentH}"></div>
+          <div class="kw-inner">
+            <div class="kw-name">${kw.keyword}</div>
+            ${kw.comment ? `<div class="kw-comment">${kw.comment}</div>` : ''}
+          </div>
+        </div>
+        ${rateHtml(kw.changeRate)}
+        <div class="sparkline-col">${sparkline(kw.values, 72, 28, isChecked)}</div>
+      </div>`;
+
+    const detail = `
+      <div class="rank-row detail-view${isChecked?' open':''}" onclick="toggleDetail(this, '${kw.keyword.replace(/'/g,"\\'")}', ${i})">
+        <div class="rank-num-wrap">
+          <div class="rank-num ${numCls}">${kw.rank}</div>
+          ${deltaHtml(kw.rank, kw.prevRank, kw.isNew)}
+        </div>
+        <div class="rank-kw-col">
+          <div class="rank-accent" style="background:${accentColor};height:${accentH}"></div>
+          <div class="kw-inner">
+            <div class="kw-name">${kw.keyword}</div>
+            ${kw.comment ? `<div class="kw-comment">${kw.comment}</div>` : ''}
+            <div class="kw-badges">${badges}</div>
+          </div>
+        </div>
+        ${rateHtml(kw.changeRate)}
+      </div>`;
 
     return `
       <div class="rank-item-wrap">
-        <div class="rank-row${isChecked?' active':''}" onclick="togglePosts(this, '${kw.keyword.replace(/'/g,"\\'")}', ${i})">
-          <div class="rank-num ${numCls}">${kw.rank}</div>
-          <div class="rank-keyword">
-            <div class="rank-accent" style="background:${accentColor}"></div>
-            <div class="keyword-inner">
-              <div class="keyword-name">${kw.keyword}</div>
-              ${kw.comment ? `<div class="keyword-comment">${kw.comment}</div>` : ''}
-              <div class="keyword-badges">
-                ${isHot ? '<span class="badge badge-hot">HOT</span>' : ''}
-                ${kw.trend==='유행중' ? '<span class="badge badge-up">유행중</span>' : ''}
-                ${kw.trend==='유행지남' ? '<span class="badge badge-down">하락세</span>' : ''}
-              </div>
-            </div>
-          </div>
-          <div>${rateTag(kw.changeRate)}</div>
-          <div class="rank-post">${kw.postCount > 0 ? kw.postCount.toLocaleString() : '—'}</div>
-          <div class="rank-bar-wrap">
-            <div class="rank-bar-track">
-              <div class="rank-bar-fill" style="width:${scoreW}%;background:${barColor}"></div>
-            </div>
-          </div>
-        </div>
-        <div class="posts-panel" id="posts-${i}">${buildPostsHtml(kw)}</div>
+        ${viewMode === 'compact' ? compact : detail}
+        <div class="detail-panel" id="panel-${i}"></div>
       </div>`;
   }).join('');
 
-  const endMsg = kws.length < 20 ? `
+  const endMsg = filtered.length < 20 ? `
     <div class="empty-end">
       <div class="empty-end-title">더 이상 트렌드가 없어요</div>
       <div class="empty-end-desc">데이터가 쌓이면 더 많은 키워드가 표시됩니다</div>
@@ -587,45 +917,67 @@ function buildRankRows(kws, maxScore) {
   return rows + endMsg;
 }
 
-// ── POSTS 즉시 렌더 (posts.js 데이터 활용) ──
-function buildPostsHtml(kw) {
-  if (!kw.posts || !kw.posts.length) return '<div class="posts-msg">게시글 정보가 없습니다. 클릭해서 불러오세요</div>';
-  return kw.posts.map(p => `
-    <a class="post-item" href="${p.link}" target="_blank" rel="noopener">
-      <div class="post-title">${p.title}</div>
-      <div class="post-desc">${p.description || ''}</div>
-      <div class="post-meta">${p.bloggerName||''} · ${p.postdate ? p.postdate.slice(0,4)+'.'+p.postdate.slice(4,6)+'.'+p.postdate.slice(6,8) : ''}</div>
-    </a>`).join('');
-}
-
-// ── TOGGLE POSTS ──
-async function togglePosts(row, keyword, idx) {
-  const panel = document.getElementById(`posts-${idx}`);
+// ── 상세 패널 토글 ──
+async function toggleDetail(row, keyword, idx) {
+  const panel = document.getElementById(`panel-${idx}`);
   const isOpen = panel.classList.contains('open');
 
-  // 열려있으면 닫기
-  document.querySelectorAll('.posts-panel.open').forEach(p => p.classList.remove('open'));
-  document.querySelectorAll('.rank-row.active').forEach(r => {
-    // checkedSet에 있는 건 active 유지, 없는건 제거
-    const kw = globalKws.find(k => r.querySelector('.keyword-name')?.textContent === k.keyword);
-    if (!kw || !checkedSet.has(kw.keyword)) r.classList.remove('active');
+  document.querySelectorAll('.detail-panel.open').forEach(p => p.classList.remove('open'));
+  document.querySelectorAll('.rank-row.open').forEach(r => {
+    const kw = globalKws.find(k => r.querySelector('.kw-name')?.textContent === k.keyword);
+    if (!kw || !checkedSet.has(kw.keyword)) r.classList.remove('open');
   });
 
   if (isOpen) return;
 
   panel.classList.add('open');
-  row.classList.add('active');
+  row.classList.add('open');
 
-  // 이미 로드된 데이터 있으면 스킵
+  // 메인 차트에서 해당 키워드 체크
+  if (!checkedSet.has(keyword)) {
+    checkedSet.add(keyword);
+    buildLegend(globalKws);
+    const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
+    drawChart(activeDays);
+  }
+
   if (panel.dataset.loaded) return;
 
-  // posts.js API 호출
+  const kw = globalKws.find(k => k.keyword === keyword);
+
+  // 상세 패널 내부 구성
+  panel.innerHTML = `
+    <div class="detail-chart-wrap"><canvas id="detail-chart-${idx}"></canvas></div>
+    <div class="detail-stats">
+      <div class="detail-stat">
+        <div class="detail-stat-label">검색 변화</div>
+        <div class="detail-stat-val ${kw?.changeRate > 0 ? 'up' : 'gray'}">${kw?.changeRate > 0 ? '+' : ''}${kw?.changeRate || 0}%</div>
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat-label">블로그 증가</div>
+        ${(kw?.blogGrowth === 0 || kw?.blogGrowth === undefined)
+          ? '<div class="detail-stat-val gray" style="font-size:11px;color:var(--gray-4)">수집 중...</div>'
+          : `<div class="detail-stat-val ${kw.blogGrowth > 0 ? 'up' : 'gray'}">${kw.blogGrowth > 0 ? '+' : ''}${kw.blogGrowth}%</div>`
+        }
+      </div>
+      <div class="detail-stat">
+        <div class="detail-stat-label">포스팅 수</div>
+        <div class="detail-stat-val gray">${kw?.postCount?.toLocaleString() || '—'}</div>
+      </div>
+    </div>
+    <div id="detail-posts-${idx}"><div class="panel-msg">게시글 불러오는 중...</div></div>
+  `;
+
+  // 상세 차트 그리기
+  if (kw?.values) drawDetailChart(idx, kw);
+
+  // 게시글 로드
   try {
     const res = await fetch('/api/posts?keyword=' + encodeURIComponent(keyword));
     const data = await res.json();
     const posts = data.posts || [];
-    panel.innerHTML = posts.length === 0
-      ? '<div class="posts-msg">관련 게시글이 없습니다.</div>'
+    document.getElementById(`detail-posts-${idx}`).innerHTML = posts.length === 0
+      ? '<div class="panel-msg">관련 게시글이 없습니다.</div>'
       : posts.map(p => `
           <a class="post-item" href="${p.link}" target="_blank" rel="noopener">
             <div class="post-title">${p.title}</div>
@@ -634,11 +986,77 @@ async function togglePosts(row, keyword, idx) {
           </a>`).join('');
     panel.dataset.loaded = '1';
   } catch(e) {
-    panel.innerHTML = '<div class="posts-msg">불러오기 실패</div>';
+    document.getElementById(`detail-posts-${idx}`).innerHTML = '<div class="panel-msg">불러오기 실패</div>';
   }
 }
 
-// ── LEGEND (체크박스) ──
+function drawDetailChart(idx, kw) {
+  const ctx = document.getElementById(`detail-chart-${idx}`)?.getContext('2d');
+  if (!ctx) return;
+  const days = 28;
+  const values = kw.values || [];
+  const raw = values.length >= days ? values.slice(-days) : [...Array(days - values.length).fill(0), ...values];
+  const labels = Array.from({length: days}, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  });
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: raw,
+        borderColor: '#03C75A',
+        backgroundColor: 'rgba(3,199,90,0.08)',
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 4,
+        tension: 0.4,
+        fill: true,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      layout: { padding: { top: 4, bottom: 4 } },
+      plugins: { legend: { display: false }, tooltip: {
+        backgroundColor: '#fff', borderColor: '#E8E8E8', borderWidth: 1,
+        titleColor: '#111', bodyColor: '#555',
+        titleFont: { family: 'Pretendard', size: 11 },
+        bodyFont: { family: 'Pretendard', size: 11 }, padding: 8,
+      }},
+      scales: {
+        x: { grid: { display: false }, ticks: { color: '#AAAAAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { display: false } },
+        y: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAAAAA', font: { size: 10, family: 'Pretendard' } }, border: { display: false } }
+      }
+    }
+  });
+}
+
+// ── 뷰 모드 ──
+function setViewMode(mode) {
+  viewMode = mode;
+  localStorage.setItem('btr_viewMode', mode);
+  const rankList = document.getElementById('rankList');
+  if (rankList) rankList.innerHTML = buildRankRows(globalKws);
+  document.querySelectorAll('.view-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.textContent.includes(mode === 'compact' ? '컴팩트' : '상세'));
+  });
+}
+
+// ── 카테고리 탭 ──
+function setupCatTabs() {
+  document.querySelectorAll('.cat-tab').forEach(btn => {
+    btn.onclick = () => {
+      document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
+      btn.classList.add('active');
+      activeCat = btn.dataset.cat;
+      document.getElementById('rankList').innerHTML = buildRankRows(globalKws);
+    };
+  });
+}
+
+// ── 범례 ──
 function buildLegend(kws) {
   const container = document.getElementById('chartLegend');
   if (!container) return;
@@ -653,7 +1071,7 @@ function buildLegend(kws) {
 
 function toggleCheck(keyword) {
   if (checkedSet.has(keyword)) {
-    if (checkedSet.size <= 1) return; // 최소 1개 유지
+    if (checkedSet.size <= 1) return;
     checkedSet.delete(keyword);
   } else {
     checkedSet.add(keyword);
@@ -661,12 +1079,10 @@ function toggleCheck(keyword) {
   buildLegend(globalKws);
   const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
   drawChart(activeDays);
-  // 랭킹 행 accent 업데이트
-  const maxScore = globalKws[0]?.score || 1;
-  document.getElementById('rankList').innerHTML = buildRankRows(globalKws, maxScore);
+  document.getElementById('rankList').innerHTML = buildRankRows(globalKws);
 }
 
-// ── CHART ──
+// ── 메인 차트 ──
 function drawChart(days) {
   if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
   const ctx = document.getElementById('trendChart')?.getContext('2d');
@@ -676,9 +1092,10 @@ function drawChart(days) {
     ? globalKws.filter(k => checkedSet.has(k.keyword))
     : (() => {
         const h = globalHistory[activeHistoryIdx];
-        return h ? h.keywords.filter(k => checkedSet.has(k.keyword)).map(k => ({
-          ...k, values: globalKws.find(g => g.keyword === k.keyword)?.values || []
-        })) : [];
+        return h ? h.keywords
+          .filter(k => checkedSet.has(k.keyword))
+          .map(k => ({ ...k, values: globalKws.find(g => g.keyword === k.keyword)?.values || [] }))
+          : [];
       })();
 
   const labels = Array.from({length: days}, (_, i) => {
@@ -697,12 +1114,12 @@ function drawChart(days) {
     return {
       label: kw.keyword,
       data: raw.map(v => Math.round(((v - minV) / range) * 100)),
-      borderColor: 'var(--green)',
-      backgroundColor: isFirst ? 'rgba(3,199,90,0.08)' : 'rgba(3,199,90,0.03)',
+      borderColor: '#03C75A',
+      backgroundColor: isFirst ? 'rgba(3,199,90,0.08)' : 'transparent',
       borderWidth: isFirst ? 2.5 : 1.5,
-      pointRadius: isFirst ? 3 : 2,
-      pointHoverRadius: 5,
-      borderDash: i === 0 ? [] : [4, 3],
+      pointRadius: isFirst ? 2 : 0,
+      pointHoverRadius: 4,
+      borderDash: i === 0 ? [] : [5, 3],
       tension: 0.4,
       fill: isFirst,
     };
@@ -713,35 +1130,30 @@ function drawChart(days) {
     data: { labels, datasets },
     options: {
       responsive: true, maintainAspectRatio: false,
-      layout: { padding: { top: 10, bottom: 10 } },
+      layout: { padding: { top: 8, bottom: 8 } },
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
         tooltip: {
-          backgroundColor: '#fff', borderColor: '#EBEBEB', borderWidth: 1,
+          backgroundColor: '#fff', borderColor: '#E8E8E8', borderWidth: 1,
           titleColor: '#111', bodyColor: '#555',
           titleFont: { family: 'Pretendard', size: 12, weight: '700' },
           bodyFont: { family: 'Pretendard', size: 11 }, padding: 10,
         }
       },
       scales: {
-        x: {
-          grid: { color: '#F5F5F5' },
-          ticks: { color: '#BBBBBB', font: { size: 11, family: 'Pretendard' } },
-          border: { color: '#EBEBEB' },
-        },
-        y: {
-          min: 0, max: 110,
-          grid: { color: '#F5F5F5' },
-          ticks: { color: '#BBBBBB', font: { size: 11, family: 'Pretendard' }, stepSize: 25, callback: v => v <= 100 ? v + '%' : '' },
-          border: { color: '#EBEBEB' },
+        x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' } }, border: { color: '#E8E8E8' } },
+        y: { min: 0, max: 110,
+          grid: { color: '#F4F4F4' },
+          ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' }, stepSize: 25, callback: v => v <= 100 ? v + '%' : '' },
+          border: { color: '#E8E8E8' }
         }
       }
     }
   });
 }
 
-// ── PERIOD TABS ──
+// ── period tabs ──
 function setupPeriodTabs() {
   document.querySelectorAll('.tab-btn').forEach(btn => {
     btn.onclick = () => {
@@ -752,20 +1164,38 @@ function setupPeriodTabs() {
   });
 }
 
-// ── HISTORY TABS ──
-function setupHistoryTabs() {
-  document.querySelectorAll('.history-tab').forEach(btn => {
+// ── history tabs ──
+function rebuildHistoryTabs() {
+  const row = document.getElementById('historyRow');
+  if (!row) return;
+
+  const recent = globalHistory.slice().reverse().slice(0, 12);
+  const hasMore = globalHistory.length > 12;
+
+  const tabs = recent.map((h, i) => {
+    const origIdx = globalHistory.length - 1 - i;
+    return `<button class="history-tab${activeHistoryIdx === origIdx ? ' active' : ''}" data-idx="${origIdx}">${fmtHistLabel(h.timestamp)}</button>`;
+  }).join('');
+
+  row.innerHTML = `
+    <button class="history-tab${activeHistoryIdx === -1 ? ' active' : ''}" data-idx="-1">현재</button>
+    ${tabs}
+    ${hasMore ? '<span class="history-more" onclick="loadHistory()">더 보기</span>' : ''}
+  `;
+
+  row.querySelectorAll('.history-tab').forEach(btn => {
     btn.onclick = () => {
-      document.querySelectorAll('.history-tab').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
       activeHistoryIdx = parseInt(btn.dataset.idx);
+      rebuildHistoryTabs();
       const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
       drawChart(activeDays);
     };
   });
 }
 
+// ── 시작 ──
 loadData();
+scheduleAutoRefresh();
 </script>
 </body>
 </html>
