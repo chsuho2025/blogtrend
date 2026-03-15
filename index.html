@@ -725,16 +725,30 @@ function scheduleAutoRefresh() {
 async function loadData() {
   try {
     const res = await fetch('/api/data');
-    if (!res.ok) throw new Error('no data');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    renderAll(data);
-    // 히스토리는 별도로 비동기 로드
+    if (!data || !data.keywords) throw new Error('데이터 형식 오류');
+    try {
+      renderAll(data);
+    } catch(renderErr) {
+      console.error('renderAll 오류:', renderErr);
+      document.getElementById('leftCol').innerHTML = `
+        <div class="card"><div class="state-wrap">
+          <div style="font-size:28px">⚠️</div>
+          <div class="state-text">화면 렌더링 중 오류가 발생했어요</div>
+          <div style="font-size:11px;color:var(--gray-4);margin-top:4px;">${renderErr.message}</div>
+        </div></div>`;
+      return;
+    }
     loadHistory();
   } catch(e) {
+    console.error('loadData 오류:', e);
     document.getElementById('leftCol').innerHTML = `
       <div class="card"><div class="state-wrap">
         <div style="font-size:28px">😶‍🌫️</div>
         <div class="state-text">데이터를 불러오지 못했어요</div>
+        <div style="font-size:11px;color:var(--gray-4);margin-top:4px;">${e.message}</div>
+        <button onclick="loadData()" style="margin-top:12px;padding:8px 16px;background:var(--black);color:#fff;border:none;border-radius:8px;cursor:pointer;font-family:Pretendard,sans-serif;font-size:13px;font-weight:600;">다시 시도</button>
       </div></div>`;
   }
 }
