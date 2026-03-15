@@ -183,12 +183,15 @@ async function updateKeywordPool(newKeywords) {
     typeof item === 'string' ? { keyword: item, addedAt: '2026-01-01' } : item
   );
 
-  // 이전 TOP20을 고정 앵커로 설정 (addedAt 갱신해서 14일 TTL 리셋)
-  const top20Anchors = top20Fixed.map(kw => ({
-    keyword: kw,
-    addedAt: today,
-    isAnchor: true,
-  }));
+  // 이전 TOP20을 고정 앵커로 설정 (addedAt은 기존 날짜 유지, 새 키워드면 오늘)
+  const top20Anchors = top20Fixed.map(kw => {
+    const existing = pool.find(p => norm(p.keyword) === norm(kw));
+    return {
+      keyword: kw,
+      addedAt: existing?.addedAt || today, // 기존 날짜 유지, 없으면 오늘
+      isAnchor: true,
+    };
+  });
   const top20Norms = new Set(top20Fixed.map(norm));
 
   // 신규 키워드 중 TOP20 앵커와 중복 아닌 것만 추가 (최대 20개)
