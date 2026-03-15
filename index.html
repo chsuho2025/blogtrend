@@ -80,23 +80,6 @@
 
 
 
-    /* ── TICKER ── */
-    .ticker-bar { background: var(--white); border-bottom: 1px solid var(--border); }
-    .ticker-inner {
-      max-width: 1160px; margin: 0 auto; padding: 0 24px;
-      display: flex; overflow-x: auto; scrollbar-width: none;
-    }
-    .ticker-inner::-webkit-scrollbar { display: none; }
-    .ticker-item {
-      padding: 9px 24px 9px 0; margin-right: 24px;
-      display: flex; align-items: center; gap: 8px;
-      white-space: nowrap; border-right: 1px solid var(--border); font-size: 12px;
-    }
-    .ticker-item:last-child { border-right: none; }
-    .ticker-label { color: var(--gray-3); font-weight: 500; }
-    .ticker-val { font-weight: 700; color: var(--black); font-variant-numeric: tabular-nums; }
-    .ticker-val.up { color: var(--green); }
-    .ticker-val.early { color: var(--green-dark); font-size: 11px; }
 
     /* ── LAYOUT ── */
     .main-wrap {
@@ -483,6 +466,38 @@
       .modal-box { max-height: 85vh; border-radius: var(--radius) var(--radius) 0 0; max-width: 100%; }
     }
 
+    /* ── 히스토리 팝업 ── */
+    .hist-modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 400;
+      align-items: center; justify-content: center; padding: 24px;
+    }
+    .hist-modal-overlay.show { display: flex; }
+    .hist-modal-box {
+      background: var(--white); border-radius: var(--radius);
+      width: 100%; max-width: 480px; max-height: 80vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+      animation: slideUp .25s ease;
+    }
+    .hist-modal-header {
+      padding: 18px 20px 14px; display: flex; align-items: center;
+      justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .hist-modal-title { font-size: 15px; font-weight: 800; color: var(--black); letter-spacing: -0.4px; }
+    .hist-modal-body { overflow-y: auto; flex: 1; padding: 8px 0; }
+    .hist-item {
+      padding: 12px 20px; border-bottom: 1px solid var(--gray-6);
+      cursor: pointer; transition: background .1s;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .hist-item:last-child { border-bottom: none; }
+    .hist-item:hover { background: var(--gray-6); }
+    .hist-item.active { background: #F0FDF6; }
+    .hist-item-time { font-size: 13px; font-weight: 700; color: var(--black); }
+    .hist-item-kws { font-size: 11px; color: var(--gray-3); margin-top: 2px; }
+    .hist-item-arrow { font-size: 12px; color: var(--gray-4); }
+
     footer { max-width: 1160px; margin: 0 auto; padding: 16px 24px 36px; display: flex; align-items: center; justify-content: space-between; }
     .footer-left { font-size: 11px; color: var(--gray-4); }
     .footer-tags { display: flex; gap: 5px; }
@@ -519,16 +534,6 @@
     </div>
   </div>
 </header>
-
-<div class="ticker-bar">
-  <div class="ticker-inner">
-    <div class="ticker-item"><span class="ticker-label">1위</span><span class="ticker-val" id="tick-top1">—</span></div>
-    <div class="ticker-item"><span class="ticker-label">최고 상승률</span><span class="ticker-val up" id="tick-rate">—</span></div>
-    <div class="ticker-item"><span class="ticker-label">🚀 조기감지</span><span class="ticker-val early" id="tick-early">—</span></div>
-    <div class="ticker-item"><span class="ticker-label">분석 키워드</span><span class="ticker-val" id="tick-count">—</span></div>
-    <div class="ticker-item"><span class="ticker-label">수집</span><span class="ticker-val" id="tick-collect">—</span></div>
-  </div>
-</div>
 
 <div class="main-wrap">
   <div class="left-col" id="leftCol">
@@ -591,6 +596,17 @@
         <div class="state-text">게시글 불러오는 중...</div>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- 히스토리 팝업 -->
+<div class="hist-modal-overlay" id="histModal" onclick="closeHistModal(event)">
+  <div class="hist-modal-box">
+    <div class="hist-modal-header">
+      <div class="hist-modal-title">📅 과거 차트 이력</div>
+      <button class="modal-close" onclick="closeHistModal()">✕</button>
+    </div>
+    <div class="hist-modal-body" id="histModalBody"></div>
   </div>
 </div>
 
@@ -780,23 +796,9 @@ function renderAll(data) {
   const rising = data.rising || [];
   const maxRate = Math.max(...globalKws.map(k => k.changeRate), 0);
 
-  // 기본 체크: 1위
-  if (checkedSet.size === 0 && globalKws.length > 0) {
-    checkedSet.add(globalKws[0].keyword);
-  }
-
   // Header
   const rankTime = data.rankUpdatedAt || data.updatedAt;
   document.getElementById('rankTime').textContent = fmt(rankTime) + ' 업데이트';
-
-  // Ticker
-  document.getElementById('tick-top1').textContent = globalKws[0]?.keyword || '—';
-  document.getElementById('tick-rate').textContent = maxRate > 0 ? `+${maxRate}%` : '—';
-  document.getElementById('tick-early').textContent = earlyTrends.length > 0
-    ? earlyTrends[0].keyword : '없음';
-  document.getElementById('tick-count').textContent = globalKws.length ? globalKws.length + '개' : '—';
-  document.getElementById('tick-collect').textContent = data.collectUpdatedAt
-    ? fmtShort(data.collectUpdatedAt) : '—';
 
   // Sidebar stats
   document.getElementById('stat-count').textContent = globalKws.length || '—';
@@ -857,12 +859,12 @@ function buildMainContent() {
   const hasCategory = kws.some(k => k.category);
 
   document.getElementById('leftCol').innerHTML = `
-    <!-- 차트 카드 -->
+    <!-- TOP5 차트 카드 -->
     <div class="card">
       <div class="card-header">
         <div>
-          <div class="card-title">트렌드 차트</div>
-          <div class="card-sub">키워드를 선택해 검색량 변화를 비교하세요</div>
+          <div class="card-title">TOP 5 트렌드 차트</div>
+          <div class="card-sub">키워드를 눌러 최고점 시점을 확인하세요</div>
         </div>
         <div class="tab-group" id="periodTabs">
           <button class="tab-btn active" data-days="7">1주</button>
@@ -880,42 +882,11 @@ function buildMainContent() {
       </div>
     </div>
 
-    <!-- 랭킹 카드 -->
-    <div class="card">
-      <div class="card-header">
-        <div>
-          <div class="card-title">실시간 랭킹</div>
-          <div class="card-sub">네이버 블로그 트렌드 TOP ${kws.length}</div>
-        </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div class="view-toggle">
-            <button class="view-btn ${viewMode==='compact'?'active':''}" onclick="setViewMode('compact')">컴팩트</button>
-            <button class="view-btn ${viewMode==='detail'?'active':''}" onclick="setViewMode('detail')">상세</button>
-          </div>
-        </div>
-      </div>
-      ${hasCategory ? `
-      <div class="cat-tabs" id="catTabs">
-        <button class="cat-tab active" data-cat="all">전체</button>
-        <button class="cat-tab" data-cat="FOOD">음식</button>
-        <button class="cat-tab" data-cat="BEAUTY">뷰티</button>
-        <button class="cat-tab" data-cat="FASHION">패션</button>
-        <button class="cat-tab" data-cat="TECH">테크</button>
-        <button class="cat-tab" data-cat="LIFE">라이프</button>
-      </div>` : ''}
-      <div class="rank-header-row">
-        <span>순위</span><span>키워드</span>
-        <span style="text-align:right">검색변화</span>
-        <span style="text-align:right">추세</span>
-      </div>
-      <div id="rankList">${buildRankRows(kws)}</div>
-    </div>
   `;
 
   buildLegend(kws);
   drawChart(7);
   setupPeriodTabs();
-  if (hasCategory) setupCatTabs();
   rebuildHistoryTabs();
 }
 
@@ -926,8 +897,8 @@ function buildRankRows(kws) {
 
   const rows = filtered.map((kw, i) => {
     const numCls = kw.rank===1?'top1':kw.rank===2?'top2':kw.rank===3?'top3':'';
-    const isChecked = checkedSet.has(kw.keyword);
-    const accentColor = isChecked ? 'var(--green)' : (kw.rank <= 3 ? 'var(--gray-3)' : 'var(--gray-5)');
+    const isChecked = false; // 차트는 TOP5 고정, 카드 선택 연동 없음
+    const accentColor = kw.rank <= 3 ? 'var(--gray-2)' : 'var(--gray-5)';
     const accentH = viewMode === 'compact' ? '22px' : '28px';
 
     const badges = [
@@ -996,23 +967,14 @@ async function toggleDetail(row, keyword, idx) {
   const isOpen = panel.classList.contains('open');
 
   document.querySelectorAll('.detail-panel.open').forEach(p => p.classList.remove('open'));
-  document.querySelectorAll('.rank-row.open').forEach(r => {
-    const kw = globalKws.find(k => r.querySelector('.kw-name')?.textContent === k.keyword);
-    if (!kw || !checkedSet.has(kw.keyword)) r.classList.remove('open');
-  });
+  document.querySelectorAll('.rank-row.open').forEach(r => r.classList.remove('open'));
 
   if (isOpen) return;
 
   panel.classList.add('open');
   row.classList.add('open');
 
-  // 메인 차트에서 해당 키워드 체크
-  if (!checkedSet.has(keyword)) {
-    checkedSet.add(keyword);
-    buildLegend(globalKws);
-    const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
-    drawChart(activeDays);
-  }
+  // 카드 클릭은 차트와 무관 (차트는 TOP5 고정)
 
   if (panel.dataset.loaded) return;
 
@@ -1163,30 +1125,38 @@ function setupCatTabs() {
 }
 
 // ── 범례 ──
+// 선택된 TOP5 키워드 (peak 하이라이트용)
+let selectedTop5Kw = null;
+
 function buildLegend(kws) {
   const container = document.getElementById('chartLegend');
   if (!container) return;
-  container.innerHTML = kws.slice(0, 10).map(kw => {
-    const active = checkedSet.has(kw.keyword);
-    return `<div class="legend-item${active?' active':''}" onclick="toggleCheck('${kw.keyword.replace(/'/g,"\\'")}')">
+  const top5 = kws.slice(0, 5);
+  container.innerHTML = top5.map((kw) => {
+    const isSelected = selectedTop5Kw === kw.keyword;
+    // peak 시점 계산
+    const vals = kw.values || [];
+    const peakIdx = vals.length ? vals.indexOf(Math.max(...vals)) : -1;
+    const peakDaysAgo = peakIdx >= 0 ? vals.length - 1 - peakIdx : -1;
+    const peakLabel = peakDaysAgo === 0 ? '오늘 최고점'
+      : peakDaysAgo === 1 ? '어제 최고점'
+      : peakDaysAgo > 1 ? peakDaysAgo + '일 전 최고점' : '';
+
+    return `<div class="legend-item${isSelected?' active':''}" onclick="selectTop5Kw('${kw.keyword.replace(/'/g,"\\'")}')">
       <div class="legend-dot"></div>
-      <span>${kw.keyword}</span>
+      <div style="display:flex;flex-direction:column;gap:1px;">
+        <span>${kw.keyword}</span>
+        ${isSelected && peakLabel ? `<span style="font-size:10px;color:var(--green-dark);font-weight:700;">${peakLabel}</span>` : ''}
+      </div>
     </div>`;
   }).join('');
 }
 
-function toggleCheck(keyword) {
-  if (checkedSet.has(keyword)) {
-    if (checkedSet.size <= 1) return;
-    checkedSet.delete(keyword);
-  } else {
-    checkedSet.add(keyword);
-  }
+function selectTop5Kw(keyword) {
+  selectedTop5Kw = selectedTop5Kw === keyword ? null : keyword;
   buildLegend(globalKws);
-  const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
-  drawChart(activeDays);
-  document.getElementById('rankList').innerHTML = buildRankRows(globalKws);
 }
+
 
 // ── 메인 차트 ──
 function drawChart(days) {
@@ -1194,14 +1164,14 @@ function drawChart(days) {
   const ctx = document.getElementById('trendChart')?.getContext('2d');
   if (!ctx) return;
 
+  // TOP5 항상 고정 (1~5위), 히스토리 모드에서도 TOP5
   const sourceKws = activeHistoryIdx === -1
-    ? globalKws.filter(k => checkedSet.has(k.keyword))
+    ? globalKws.slice(0, 5)
     : (() => {
         const h = globalHistory[activeHistoryIdx];
-        return h ? h.keywords
-          .filter(k => checkedSet.has(k.keyword))
-          .map(k => ({ ...k, values: globalKws.find(g => g.keyword === k.keyword)?.values || [] }))
-          : [];
+        return h ? h.keywords.slice(0, 5).map(k => ({
+          ...k, values: globalKws.find(g => g.keyword === k.keyword)?.values || []
+        })) : globalKws.slice(0, 5);
       })();
 
   const labels = Array.from({length: days}, (_, i) => {
@@ -1275,10 +1245,11 @@ function rebuildHistoryTabs() {
   const row = document.getElementById('historyRow');
   if (!row) return;
 
-  const recent = globalHistory.slice().reverse().slice(0, 12);
-  const hasMore = globalHistory.length > 12;
+  // 최근 5개만 탭으로 표시
+  const recent5 = globalHistory.slice().reverse().slice(0, 5);
+  const hasMore = globalHistory.length > 5;
 
-  const tabs = recent.map((h, i) => {
+  const tabs = recent5.map((h, i) => {
     const origIdx = globalHistory.length - 1 - i;
     return `<button class="history-tab${activeHistoryIdx === origIdx ? ' active' : ''}" data-idx="${origIdx}">${fmtHistLabel(h.timestamp)}</button>`;
   }).join('');
@@ -1286,7 +1257,7 @@ function rebuildHistoryTabs() {
   row.innerHTML = `
     <button class="history-tab${activeHistoryIdx === -1 ? ' active' : ''}" data-idx="-1">현재</button>
     ${tabs}
-    ${hasMore ? '<span class="history-more" onclick="loadHistory()">더 보기</span>' : ''}
+    ${hasMore ? '<span class="history-more" onclick="openHistModal()">+ 더 보기</span>' : ''}
   `;
 
   row.querySelectorAll('.history-tab').forEach(btn => {
@@ -1299,9 +1270,48 @@ function rebuildHistoryTabs() {
   });
 }
 
+// ── 히스토리 팝업 ──
+function openHistModal() {
+  const modal = document.getElementById('histModal');
+  const body = document.getElementById('histModalBody');
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+
+  const allHistory = globalHistory.slice().reverse();
+  body.innerHTML = allHistory.map((h, i) => {
+    const origIdx = globalHistory.length - 1 - i;
+    const isActive = activeHistoryIdx === origIdx;
+    const top3 = h.keywords ? h.keywords.slice(0, 3).map(k => k.keyword).join(', ') : '';
+    return `<div class="hist-item${isActive ? ' active' : ''}" onclick="selectHistory(${origIdx})">
+      <div>
+        <div class="hist-item-time">${fmtHistLabel(h.timestamp)}</div>
+        <div class="hist-item-kws">1위: ${top3}</div>
+      </div>
+      <span class="hist-item-arrow">→</span>
+    </div>`;
+  }).join('');
+}
+
+function selectHistory(idx) {
+  activeHistoryIdx = idx;
+  closeHistModal();
+  rebuildHistoryTabs();
+  const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
+  drawChart(activeDays);
+}
+
+function closeHistModal(e) {
+  if (e && e.target !== document.getElementById('histModal')) return;
+  document.getElementById('histModal').classList.remove('show');
+  document.body.style.overflow = '';
+}
+
 // ESC 키로 모달 닫기
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closePostsModal();
+  if (e.key === 'Escape') {
+    closePostsModal();
+    closeHistModal();
+  }
 });
 
 // ── 시작 ──
