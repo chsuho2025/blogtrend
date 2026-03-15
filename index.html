@@ -418,6 +418,86 @@
     .stat-sub { font-size: 10px; color: var(--gray-3); margin-top: 2px; }
 
     /* ── FOOTER ── */
+    /* ── 게시글 모달 ── */
+    .modal-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.45); z-index: 300;
+      align-items: center; justify-content: center;
+      padding: 24px;
+      animation: fadeIn .2s ease;
+    }
+    .modal-overlay.show { display: flex; }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+
+    .modal-box {
+      background: var(--white); border-radius: var(--radius);
+      width: 100%; max-width: 600px; max-height: 80vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
+      animation: slideUp .25s ease;
+    }
+    @keyframes slideUp { from{opacity:0;transform:translateY(16px)} to{opacity:1;transform:translateY(0)} }
+
+    .modal-header {
+      padding: 20px 20px 16px; display: flex; align-items: center;
+      justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .modal-title { font-size: 16px; font-weight: 800; color: var(--black); letter-spacing: -0.4px; }
+    .modal-sub { font-size: 12px; color: var(--gray-3); margin-top: 2px; }
+    .modal-close {
+      width: 32px; height: 32px; border-radius: 50%;
+      background: var(--gray-6); border: none; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px; color: var(--gray-3); transition: all .15s; flex-shrink: 0;
+    }
+    .modal-close:hover { background: var(--gray-5); color: var(--black); }
+
+    .modal-body { overflow-y: auto; flex: 1; }
+    .modal-body::-webkit-scrollbar { width: 4px; }
+    .modal-body::-webkit-scrollbar-track { background: transparent; }
+    .modal-body::-webkit-scrollbar-thumb { background: var(--gray-5); border-radius: 2px; }
+
+    .modal-post-item {
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 14px 20px; border-bottom: 1px solid var(--gray-6);
+      text-decoration: none; transition: background .1s;
+    }
+    .modal-post-item:last-child { border-bottom: none; }
+    .modal-post-item:hover { background: #F0FDF6; }
+    .modal-post-title {
+      font-size: 14px; font-weight: 600; color: var(--black);
+      line-height: 1.4; display: -webkit-box;
+      -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .modal-post-desc {
+      font-size: 12px; color: var(--gray-3); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden;
+    }
+    .modal-post-meta { font-size: 11px; color: var(--gray-4); margin-top: 2px; }
+
+    .modal-loading {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 48px; gap: 12px;
+    }
+    .modal-empty { padding: 48px; text-align: center; color: var(--gray-3); font-size: 13px; }
+
+    /* 게시글 보기 버튼 */
+    .posts-btn {
+      display: flex; align-items: center; gap: 6px;
+      margin: 0 20px 16px; padding: 10px 16px;
+      background: var(--gray-6); border: 1.5px solid var(--border);
+      border-radius: 10px; cursor: pointer; transition: all .15s;
+      font-family: 'Pretendard', sans-serif; font-size: 13px;
+      font-weight: 600; color: var(--gray-2); width: calc(100% - 40px);
+      justify-content: center;
+    }
+    .posts-btn:hover { background: var(--green-dim); border-color: var(--green); color: var(--green-dark); }
+
+    @media (max-width: 600px) {
+      .modal-overlay { padding: 0; align-items: flex-end; }
+      .modal-box { max-height: 85vh; border-radius: var(--radius) var(--radius) 0 0; max-width: 100%; }
+    }
+
     footer { max-width: 1160px; margin: 0 auto; padding: 16px 24px 36px; display: flex; align-items: center; justify-content: space-between; }
     .footer-left { font-size: 11px; color: var(--gray-4); }
     .footer-tags { display: flex; gap: 5px; }
@@ -511,6 +591,25 @@
         <div class="stat-cell"><div class="stat-label">최고 상승률</div><div class="stat-val green" id="stat-rate">—</div><div class="stat-sub">%</div></div>
         <div class="stat-cell"><div class="stat-label">1위 키워드</div><div class="stat-val sm" id="stat-top">—</div><div class="stat-sub">현재 1위</div></div>
         <div class="stat-cell"><div class="stat-label">조기감지</div><div class="stat-val sm green" id="stat-early">—</div><div class="stat-sub">개</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 게시글 모달 -->
+<div class="modal-overlay" id="postsModal" onclick="closePostsModal(event)">
+  <div class="modal-box">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="modalTitle">최근 게시글</div>
+        <div class="modal-sub" id="modalSub">네이버 블로그 최신 게시글</div>
+      </div>
+      <button class="modal-close" onclick="closePostsModal()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="modal-loading">
+        <div class="loading-ring"></div>
+        <div class="state-text">게시글 불러오는 중...</div>
       </div>
     </div>
   </div>
@@ -965,29 +1064,64 @@ async function toggleDetail(row, keyword, idx) {
         <div class="detail-stat-val gray">${kw?.postCount?.toLocaleString() || '—'}</div>
       </div>
     </div>
-    <div id="detail-posts-${idx}"><div class="panel-msg">게시글 불러오는 중...</div></div>
-  `;
+    <button class="posts-btn" onclick="openPostsModal('${keyword.replace(/'/g, "\'")}', event)">
+      📝 최근 게시글 보기
+    </button>
+  \`;
 
   // 상세 차트 그리기
   if (kw?.values) drawDetailChart(idx, kw);
 
-  // 게시글 로드
+  panel.dataset.loaded = '1';
+}
+
+// ── 게시글 모달 ──
+async function openPostsModal(keyword, e) {
+  if (e) e.stopPropagation();
+  const modal = document.getElementById('postsModal');
+  const body = document.getElementById('modalBody');
+  const title = document.getElementById('modalTitle');
+  const sub = document.getElementById('modalSub');
+
+  title.textContent = keyword;
+  sub.textContent = '네이버 블로그 최신 게시글';
+  body.innerHTML = \`<div class="modal-loading">
+    <div class="loading-ring"></div>
+    <div class="state-text">게시글 불러오는 중...</div>
+  </div>\`;
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+
   try {
-    const res = await fetch('/api/posts?keyword=' + encodeURIComponent(keyword));
+    const res = await fetch('/api/posts?keyword=' + encodeURIComponent(keyword) + '&display=20');
     const data = await res.json();
     const posts = data.posts || [];
-    document.getElementById(`detail-posts-${idx}`).innerHTML = posts.length === 0
-      ? '<div class="panel-msg">관련 게시글이 없습니다.</div>'
-      : posts.map(p => `
-          <a class="post-item" href="${p.link}" target="_blank" rel="noopener">
-            <div class="post-title">${p.title}</div>
-            <div class="post-desc">${p.description || ''}</div>
-            <div class="post-meta">${p.bloggerName||''} · ${p.postdate ? p.postdate.slice(0,4)+'.'+p.postdate.slice(4,6)+'.'+p.postdate.slice(6,8) : ''}</div>
-          </a>`).join('');
-    panel.dataset.loaded = '1';
+
+    if (posts.length === 0) {
+      body.innerHTML = '<div class="modal-empty">관련 게시글이 없습니다.</div>';
+      return;
+    }
+
+    sub.textContent = \`최근 게시글 \${posts.length}개\`;
+    body.innerHTML = posts.map(p => {
+      const date = p.postdate
+        ? p.postdate.slice(0,4) + '.' + p.postdate.slice(4,6) + '.' + p.postdate.slice(6,8)
+        : '';
+      return \`<a class="modal-post-item" href="\${p.link}" target="_blank" rel="noopener">
+        <div class="modal-post-title">\${p.title}</div>
+        \${p.description ? \`<div class="modal-post-desc">\${p.description}</div>\` : ''}
+        <div class="modal-post-meta">\${p.bloggerName || ''} · \${date}</div>
+      </a>\`;
+    }).join('');
   } catch(e) {
-    document.getElementById(`detail-posts-${idx}`).innerHTML = '<div class="panel-msg">불러오기 실패</div>';
+    body.innerHTML = '<div class="modal-empty">불러오기 실패. 잠시 후 다시 시도해 주세요.</div>';
   }
+}
+
+function closePostsModal(e) {
+  if (e && e.target !== document.getElementById('postsModal')) return;
+  document.getElementById('postsModal').classList.remove('show');
+  document.body.style.overflow = '';
 }
 
 function drawDetailChart(idx, kw) {
@@ -1192,6 +1326,11 @@ function rebuildHistoryTabs() {
     };
   });
 }
+
+// ESC 키로 모달 닫기
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closePostsModal();
+});
 
 // ── 시작 ──
 loadData();
