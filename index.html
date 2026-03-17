@@ -511,6 +511,35 @@
       .rank-blog-col { display: none; }
       .rank-row.detail-view { grid-template-columns: 40px 1fr 80px; }
     }
+    @media (max-width: 600px) {
+      .header-inner { padding: 0 14px; }
+      .logo-name { font-size: 13px; }
+      .main-wrap { padding: 12px 10px; gap: 10px; }
+      .card { border-radius: 10px; }
+      .card-header { padding: 14px 14px 10px; }
+      .card-title { font-size: 14px; }
+      .rank-header-row, .rank-row { grid-template-columns: 36px 1fr 70px 60px; padding: 9px 14px; }
+      .rank-num { width: 24px; height: 24px; font-size: 11px; }
+      .kw-name { font-size: 13px; }
+      .kw-comment { font-size: 11px; }
+      .sparkline-col svg { width: 60px; }
+      .detail-panel { padding: 12px 14px; }
+      .detail-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+      .detail-stat-val { font-size: 15px; }
+      .posts-btn { margin: 0 14px 12px; width: calc(100% - 28px); }
+      .top5-item { padding: 10px 14px; }
+      .top5-kw { font-size: 13px; }
+      .history-row { padding: 8px 14px; gap: 6px; }
+      .history-tab { padding: 4px 10px; font-size: 11px; }
+      .modal-overlay { padding: 0; align-items: flex-end; }
+      .modal-box { border-radius: 14px 14px 0 0; max-width: 100%; max-height: 90vh; }
+      .modal-header { padding: 16px 16px 12px; }
+      .modal-post-item { padding: 12px 16px; }
+      .chart-wrap { height: 160px; }
+      .right-col { display: none; }
+      .footer-left, .footer-right { font-size: 10px; }
+      footer { padding: 12px 14px 24px; flex-direction: column; gap: 4px; }
+    }
   </style>
 </head>
 <body>
@@ -691,11 +720,20 @@ function fmt(iso) {
 function fmtShort(iso) {
   return new Date(iso).toLocaleTimeString('ko-KR', { hour:'2-digit', minute:'2-digit' });
 }
-function fmtHistLabel(iso) {
+function fmtHistLabel(iso, date) {
+  // date 필드가 있으면 날짜만 표시 (3/15)
+  if (date) {
+    const d = new Date(date + 'T00:00:00+09:00');
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    if (date === todayStr) return '오늘';
+    return `${d.getMonth()+1}/${d.getDate()}`;
+  }
+  // 구형 호환
   const d = new Date(iso);
+  const hh = d.getHours().toString().padStart(2,'0');
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
-  const hh = d.getHours().toString().padStart(2,'0');
   const prefix = isToday ? '' : `${d.getMonth()+1}/${d.getDate()} `;
   return `${prefix}${hh}:00`;
 }
@@ -888,7 +926,7 @@ function buildMainContent() {
       <div class="card-header">
         <div>
           <div class="card-title">실시간 랭킹</div>
-          <div class="card-sub">네이버 블로그 트렌드 TOP ${kws.length}</div>
+          <div class="card-sub">네이버 블로그 트렌드 TOP 10</div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <div class="view-toggle">
@@ -928,7 +966,7 @@ function buildRankRows(kws) {
   const filtered = activeCat === 'all' ? kws : kws.filter(k => k.category === activeCat);
   if (!filtered.length) return `<div style="padding:40px;text-align:center;color:var(--gray-3);font-size:13px;">해당 카테고리 데이터가 없어요</div>`;
 
-  const rows = filtered.map((kw, i) => {
+  const rows = filtered.slice(0, 10).map((kw, i) => {
     const numCls = kw.rank===1?'top1':kw.rank===2?'top2':kw.rank===3?'top3':'';
     const isChecked = selectedTop5Kw === kw.keyword;
     const accentColor = isChecked ? 'var(--green)' : (kw.rank <= 3 ? 'var(--gray-2)' : 'var(--gray-5)');
@@ -1290,13 +1328,12 @@ function rebuildHistoryTabs() {
   const row = document.getElementById('historyRow');
   if (!row) return;
 
-  // 최근 5개만 탭으로 표시
   const recent5 = globalHistory.slice().reverse().slice(0, 5);
   const hasMore = globalHistory.length > 5;
 
   const tabs = recent5.map((h, i) => {
     const origIdx = globalHistory.length - 1 - i;
-    return `<button class="history-tab${activeHistoryIdx === origIdx ? ' active' : ''}" data-idx="${origIdx}">${fmtHistLabel(h.timestamp)}</button>`;
+    return `<button class="history-tab${activeHistoryIdx === origIdx ? ' active' : ''}" data-idx="${origIdx}">${fmtHistLabel(h.timestamp, h.date)}</button>`;
   }).join('');
 
   row.innerHTML = `
@@ -1329,7 +1366,7 @@ function openHistModal() {
     const top3 = h.keywords ? h.keywords.slice(0, 3).map(k => k.keyword).join(', ') : '';
     return `<div class="hist-item${isActive ? ' active' : ''}" onclick="selectHistory(${origIdx})">
       <div>
-        <div class="hist-item-time">${fmtHistLabel(h.timestamp)}</div>
+        <div class="hist-item-time">${fmtHistLabel(h.timestamp, h.date)}</div>
         <div class="hist-item-kws">1위: ${top3}</div>
       </div>
       <span class="hist-item-arrow">→</span>
