@@ -109,14 +109,23 @@ async function collectBlogTitles() {
       '후기', '추천', '리뷰', '구매', '사용', '소개', '정보', '방법', '이유', '가격',
       '할인', '이벤트', '신상', '신제품', '베스트', '선물', '일기', '분석', '걱정',
       '변화', '스마트', '필수', '필수템', '찾은', '많은', '좋은', '새로운', '쉬운',
+      '나만의', '이야기', '가능한', '특별한', '다양한', '중요한', '솔직한', '완벽한',
+      '줄거리', '내용', '결말', '리뷰', '총정리', '정리', '꿀팁', '공유', '추천하는',
+      '마케팅', '브랜딩', '관리', '운영', '전략', '방식', '노하우',
     ]);
+    // 광고성 패턴 (법률/의료/부동산)
+    const AD_PATTERNS = [
+      /변호사$/, /법률/, /법인/, /소송/, /파산/, /이혼/, /형사/,
+      /병원$/, /의원$/, /클리닉$/, /한의원$/, /치과$/,
+      /부동산/, /아파트/, /분양/, /임대/, /매매/,
+    ];
     for (const title of titles) {
-      // 한글 4자 이상, 또는 한글+영문 혼합 3자 이상
       const words = title.match(/[가-힣]{4,}|[가-힣a-zA-Z0-9]{3,}/g) || [];
       for (const w of words) {
         if (STOP_WORDS.has(w)) continue;
-        if (/^\d+$/.test(w)) continue; // 숫자만인 것 제외
-        if (/^[A-Z]{1,3}$/.test(w)) continue; // 단독 대문자 약어 제외
+        if (/^\d+$/.test(w)) continue;
+        if (/^[A-Z]{1,4}$/.test(w)) continue;
+        if (AD_PATTERNS.some(p => p.test(w))) continue; // 광고성 단어 제외
         freq[w] = (freq[w] || 0) + 1;
       }
     }
@@ -217,10 +226,19 @@ async function extractTrendKeywords(titles, risingWords = []) {
   // 코드 필터: 타입, 최소 길이, 특수문자, 띄어쓰기 중복
   const norm = s => s.replace(/\s+/g, '').toLowerCase();
   const seenNorm = new Set();
+  // 광고성/노이즈 키워드 패턴
+  const NOISE_KW = [
+    /변호사/, /법률/, /법인/, /소송/, /파산/, /이혼/, /형사/, /민사/, /고소/,
+    /병원/, /의원/, /클리닉/, /한의원/, /치과/, /성형/, /피부과/,
+    /부동산/, /분양/, /임대/, /매매/, /공인중개/,
+    /줄거리/, /결말/, /등장인물/, /마케팅/, /브랜딩/,
+    /추천하는/, /솔직한/, /나만의/, /이야기/, /가능한/, /특별한/,
+  ];
   const filtered = allKeywords.filter(kw => {
     if (typeof kw !== 'string') return false;
     if (kw.length < 2) return false;
     if (/[\[\]【】()（）<>《》]/.test(kw)) return false;
+    if (NOISE_KW.some(p => p.test(kw))) return false;
     const n = norm(kw);
     if (seenNorm.has(n)) return false;
     seenNorm.add(n);
