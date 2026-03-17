@@ -203,7 +203,8 @@ async function extractTrendKeywords(titles, risingWords = []) {
 - 날짜/연도/이름 단독 (예: 2026년 3월 15일, 2025년 하반기 채니의 일상)
 - 범용어 단독 (예: 홈트레이닝, 다이어트, 맛집, 추천, 후기)${risingHint}
 
-반드시 JSON 배열로만: ["키워드1","키워드2",...]
+반드시 JSON 배열로만, 정확히 15개: ["키워드1","키워드2",...,"키워드15"]
+15개 미만이어도 되지만 15개를 초과하면 절대 안 돼.
 다른 설명 없이 JSON만.`,
               },
               {
@@ -221,8 +222,9 @@ async function extractTrendKeywords(titles, risingWords = []) {
       const data = await res.json();
       const text = data.result?.message?.content || '[]';
       const keywords = JSON.parse(text.replace(/```json|```/g, '').trim());
-      console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1}: ${keywords.length}개 →`, keywords);
-      allKeywords.push(...keywords);
+      const limited = keywords.slice(0, 15); // chunk당 최대 15개 강제 제한
+      console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1}: ${limited.length}개 →`, limited);
+      allKeywords.push(...limited);
     } catch (e) {
       console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1} 실패:`, e.message);
     }
@@ -234,6 +236,7 @@ async function extractTrendKeywords(titles, risingWords = []) {
   // 광고성/노이즈 키워드 패턴
   const NOISE_KW = [
     /변호사/, /법률/, /법인/, /소송/, /파산/, /이혼/, /형사/, /민사/, /고소/,
+    /성범죄/, /추행/, /그루밍/, /성폭/, /성추행/, /강간/, /음란/, /도촬/,
     /병원/, /의원/, /클리닉/, /한의원/, /치과/, /성형/, /피부과/,
     /부동산/, /분양/, /임대/, /매매/, /공인중개/,
     /줄거리/, /결말/, /등장인물/, /마케팅/, /브랜딩/,
