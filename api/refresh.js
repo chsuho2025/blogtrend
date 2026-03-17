@@ -33,72 +33,52 @@ async function collectBlogTitles() {
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-  // 오늘(최신 50개)과 어제(다음 50개) 분리 수집
-  const todayTitles = [];
-  const yesterdayTitles = [];
-  const seenToday = new Set();
-  const seenYesterday = new Set();
+  // display=100으로 한 번에 수집: 앞 50개(최근 3일) vs 뒤 50개(이전 3일)
+  const recentTitles = [];  // 최근 3일
+  const olderTitles = [];   // 이전 3일
+  const seenRecent = new Set();
+  const seenOlder = new Set();
 
   for (const keyword of NET_KEYWORDS) {
     await sleep(100);
     try {
-      // 오늘: start=1 (최신 50개)
-      const urlToday = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=50&start=1&sort=date`;
-      const resToday = await fetch(urlToday, {
+      const url = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=100&start=1&sort=date`;
+      const res = await fetch(url, {
         headers: {
           'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
           'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
         },
       });
-      const dataToday = await resToday.json();
-      if (dataToday.items) {
-        rawCount += dataToday.items.length;
-        for (const item of dataToday.items) {
+      const data = await res.json();
+      if (data.items) {
+        rawCount += data.items.length;
+        data.items.forEach((item, idx) => {
           const title = item.title
             .replace(/<[^>]+>/g, '')
             .replace(/&amp;/g, '&').replace(/&quot;/g, '"')
             .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
             .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c))
             .trim();
-          if (!seenToday.has(title)) { seenToday.add(title); todayTitles.push(title); }
-          if (!seenTitles.has(title)) { seenTitles.add(title); allTitles.push(title); }
-        }
-      }
-    } catch (e) {
-      console.log(`[collectBlogTitles] ${keyword} 오늘 오류:`, e.message);
-    }
 
-    await sleep(100);
-    try {
-      // 어제: start=51 (다음 50개)
-      const urlYesterday = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=50&start=51&sort=date`;
-      const resYesterday = await fetch(urlYesterday, {
-        headers: {
-          'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
-          'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
-        },
-      });
-      const dataYesterday = await resYesterday.json();
-      if (dataYesterday.items) {
-        for (const item of dataYesterday.items) {
-          const title = item.title
-            .replace(/<[^>]+>/g, '')
-            .replace(/&amp;/g, '&').replace(/&quot;/g, '"')
-            .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-            .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c))
-            .trim();
-          if (!seenYesterday.has(title)) { seenYesterday.add(title); yesterdayTitles.push(title); }
+          // 앞 50개 = 최근 3일, 뒤 50개 = 이전 3일
+          if (idx < 50) {
+            if (!seenRecent.has(title)) { seenRecent.add(title); recentTitles.push(title); }
+          } else {
+            if (!seenOlder.has(title)) { seenOlder.add(title); olderTitles.push(title); }
+          }
           if (!seenTitles.has(title)) { seenTitles.add(title); allTitles.push(title); }
-        }
+        });
+      } else {
+        console.log(`[collectBlogTitles] ${keyword} 빈응답`);
       }
     } catch (e) {
-      console.log(`[collectBlogTitles] ${keyword} 어제 오류:`, e.message);
+      console.log(`[collectBlogTitles] ${keyword} 오류:`, e.message);
     }
   }
 
   const filtered = allTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
-  const filteredToday = todayTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
-  const filteredYesterday = yesterdayTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
+  const filteredRecent = recentTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
+  const filteredOlder = olderTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
 
   // 명사구 단위 빈도 계산 (서술어/형용사 어미 제외)
   const tokenize = titles => {
@@ -128,22 +108,22 @@ async function collectBlogTitles() {
     return freq;
   };
 
-  const todayFreq = tokenize(filteredToday);
-  const yesterdayFreq = tokenize(filteredYesterday);
+  const recentFreq = tokenize(filteredRecent);
+  const olderFreq = tokenize(filteredOlder);
 
-  // 오늘 급등 단어 추출 (오늘 빈도 / 어제 빈도 비율 2배 이상 + 오늘 최소 3회)
-  const risingWords = Object.entries(todayFreq)
+  // 최근 3일 vs 이전 3일 급등 단어 추출
+  const risingWords = Object.entries(recentFreq)
     .filter(([word, cnt]) => {
-      if (cnt < 2) return false; // 오늘 최소 2회
-      const yesterday = yesterdayFreq[word] || 0;
-      if (yesterday === 0) return cnt >= 3; // 어제 없었으면 오늘 3회 이상
-      return (cnt / yesterday) >= 1.5; // 1.5배 이상 급등
+      if (cnt < 2) return false;
+      const older = olderFreq[word] || 0;
+      if (older === 0) return cnt >= 3;
+      return (cnt / older) >= 1.5;
     })
     .sort((a, b) => b[1] - a[1])
     .slice(0, 30)
     .map(([word]) => word);
 
-  console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (오늘: ${filteredToday.length}개, 어제: ${filteredYesterday.length}개)`);
+  console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (최근3일: ${filteredRecent.length}개, 이전3일: ${filteredOlder.length}개)`);
   console.log(`[collectBlogTitles] 급상승 단어 TOP10:`, risingWords.slice(0, 10));
 
   return { titles: filtered, risingWords };
@@ -157,8 +137,9 @@ async function extractTrendKeywords(titles, risingWords = []) {
   const allKeywords = [];
 
   // risingWords 상위 20개를 프롬프트에 힌트로 제공
+  // risingWords 상위 20개를 프롬프트에 힌트로 제공
   const risingHint = risingWords.length > 0
-    ? `\n\n참고: 오늘 블로그에서 급상승한 단어들이야. 이 단어가 포함된 키워드를 우선적으로 뽑아줘:\n${risingWords.slice(0, 20).join(', ')}`
+    ? `\n\n참고: 최근 3일간 블로그에서 급상승한 단어들이야. 이 단어가 포함된 키워드를 우선적으로 뽑아줘:\n${risingWords.slice(0, 20).join(', ')}`
     : '';
 
   for (let i = 0; i < Math.min(titles.length, 1600); i += CHUNK_SIZE) {
@@ -195,7 +176,8 @@ async function extractTrendKeywords(titles, risingWords = []) {
 - 범용어 단독 (예: 홈트레이닝, 다이어트, 맛집, 추천, 후기)
 - 연예인/인물 이름 (예: 이영애, 신봉선, 이휘재, 쯔양) — 반드시 제외
 - TV 프로그램/방송 콘텐츠 (예: 나솔사계, 현역가왕, 나는솔로)
-- 지역 맛집/카페 (예: 경복궁맛집, 을지로 돌판집, 선릉 버터떡 맛집)${risingHint}
+- 지역 맛집/카페 (예: 경복궁맛집, 을지로 돌판집, 선릉 버터떡 맛집)
+- 단독 단어 (예: 화이트, 가지, 스마트, 분위기, 직장인, 드라마, 우리, 비교)
 
 반드시 JSON 배열로만, 정확히 15개: ["키워드1","키워드2",...,"키워드15"]
 15개 미만이어도 되지만 15개를 초과하면 절대 안 돼.
@@ -312,8 +294,27 @@ async function updateKeywordPool(newKeywords) {
   console.log(`[updateKeywordPool] 14일 초과 제거: ${pool.length}개 → ${poolFiltered.length}개`);
 
   // 구성: [이전 TOP20 앵커] + [신규 20개] + [기존 pool 잔여]
-  const merged = [...top20Anchors, ...newEntries, ...poolFiltered].slice(0, 100);
-  await redis.set('keyword_pool', JSON.stringify(merged));
+  // pool 저장 전 연예인/인물/단어 필터링
+  const POOL_NOISE = [
+    /변호사/, /법률/, /소송/, /성범죄/, /추행/, /그루밍/, /중절/, /로펌/,
+    /나솔/, /현역가왕/, /태교여행/, /핫딜/, /공매도/,
+  ];
+  const POOL_STOP_SINGLES = new Set([
+    '화이트', '가지', '스마트', '분위기', '직장인', '드라마', '우리', '비교',
+    '에어', '한정판', '실사용', '언박싱', '필라테스', '가습기', '두쫀쿠',
+    '다이어트', '홈트레이닝', '맛집', '후기', '추천',
+  ]);
+
+  const cleanMerged = [...top20Anchors, ...newEntries, ...poolFiltered]
+    .filter(item => {
+      const kw = item.keyword;
+      if (POOL_STOP_SINGLES.has(kw)) return false;
+      if (POOL_NOISE.some(p => p.test(kw))) return false;
+      return true;
+    })
+    .slice(0, 100);
+
+  await redis.set('keyword_pool', JSON.stringify(cleanMerged));
   console.log(`[updateKeywordPool] pool 크기: ${merged.length} (앵커: ${top20Anchors.length}개, 신규: ${newEntries.length}개)`);
   return merged;
 }
@@ -665,7 +666,25 @@ module.exports = async (req, res) => {
     await redis.set('trend_data', JSON.stringify(result));
 
     // 이전 TOP20 키워드 목록 저장 (다음 리프레시에서 pool 앵커로 사용)
-    const top20Keywords = finalRanked.map(k => k.keyword);
+    // 연예인/인물/노이즈 필터링 후 저장
+    const TOP20_NOISE = [
+      /변호사/, /법률/, /소송/, /성범죄/, /추행/, /그루밍/, /중절/, /로펌/,
+      /나솔/, /현역가왕/, /태교여행/, /핫딜/, /공매도/,
+    ];
+    const TOP20_STOP = new Set([
+      '화이트', '가지', '스마트', '분위기', '직장인', '드라마', '우리', '비교',
+      '에어', '한정판', '실사용', '언박싱', '필라테스', '가습기',
+      '다이어트', '홈트레이닝', '맛집', '후기', '추천', '버터떡',
+    ]);
+    const top20Keywords = finalRanked
+      .map(k => k.keyword)
+      .filter(kw => {
+        if (TOP20_STOP.has(kw)) return false;
+        if (TOP20_NOISE.some(p => p.test(kw))) return false;
+        // 2자 이하 단어 제외
+        if (kw.replace(/\s/g, '').length <= 2) return false;
+        return true;
+      });
     await redis.set('top20_pool', JSON.stringify(top20Keywords));
     console.log('[top20_pool] 저장:', top20Keywords.slice(0, 5));
 
