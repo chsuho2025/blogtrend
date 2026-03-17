@@ -52,7 +52,7 @@ async function getBlogGrowth(keywords) {
         }
       );
       const data = await res.json();
-      const currentCount = data.total || 0;
+      const currentCount = data.total != null ? data.total : null;
 
       // Redis에서 이전 포스팅 수 히스토리 조회
       let growthHistory = [];
@@ -66,7 +66,7 @@ async function getBlogGrowth(keywords) {
       growthHistory = growthHistory.filter(h => h.timestamp > cutoff);
 
       // 새 기록 추가
-      growthHistory.push({ timestamp: now, count: currentCount });
+      growthHistory.push({ timestamp: now, count: currentCount ?? 0 });
       await redis.set(`blog_growth:${kw}`, JSON.stringify(growthHistory));
 
       // 블로그 성장률 계산 (최근 1시간 vs 이전 1시간)
@@ -119,29 +119,26 @@ async function applyEMA(keyword, currentScore) {
 // Step 3: Early Trend 감지
 // ─────────────────────────────────────────
 function detectEarlyTrend(trends, postCountMap) {
-  // 전체 검색량 분포에서 퍼센타일 계산
   const indices = trends
     .map(t => avg(t.values.slice(-7)))
     .filter(v => v > 0)
     .sort((a, b) => a - b);
 
-  const p30 = percentile(indices, 30);
+  const p50 = percentile(indices, 50); // P30 → P50으로 완화
 
   return trends.map(t => {
     const currentIndex = avg(t.values.slice(-7));
     const isEarlyTrend = (
-      t.risingRate >= 200 &&          // 최근 3일 200% 이상 상승
-      currentIndex <= p30 &&           // 검색량 하위 30% (아직 작음)
-      currentIndex > 0 &&              // 검색량 아예 없으면 제외
-      t.weeklyRate >= 0               // 장기 하락 아님
+      t.risingRate >= 100 &&          // 200% → 100%로 완화
+      currentIndex <= p50 &&           // P30 → P50으로 완화 (중간 이하면 아직 초기)
+      currentIndex > 0 &&
+      t.weeklyRate >= -10             // 약간의 하락도 허용
     );
 
-    // earlyScore 계산
-    const maxRising = Math.max(...trends.map(t2 => t2.risingRate), 1);
-    const novelty = p30 > 0 ? Math.max(0, 1 - (currentIndex / p30)) : 0;
+    const novelty = p50 > 0 ? Math.max(0, 1 - (currentIndex / p50)) : 0;
     const earlyScore = isEarlyTrend
-      ? (Math.min(t.risingRate / 500, 1)) * 0.6
-        + (Math.min(t.weeklyRate / 200, 1)) * 0.2
+      ? (Math.min(t.risingRate / 300, 1)) * 0.6
+        + (Math.min(Math.max(t.weeklyRate, 0) / 100, 1)) * 0.2
         + novelty * 0.2
       : 0;
 

@@ -33,53 +33,117 @@ async function collectBlogTitles() {
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+  // 오늘(최신 50개)과 어제(다음 50개) 분리 수집
+  const todayTitles = [];
+  const yesterdayTitles = [];
+  const seenToday = new Set();
+  const seenYesterday = new Set();
+
   for (const keyword of NET_KEYWORDS) {
     await sleep(100);
     try {
-      const url = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=50&sort=date`;
-      const res = await fetch(url, {
+      // 오늘: start=1 (최신 50개)
+      const urlToday = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=50&start=1&sort=date`;
+      const resToday = await fetch(urlToday, {
         headers: {
           'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
           'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
         },
       });
-      const data = await res.json();
-      if (data.items) {
-        rawCount += data.items.length;
-        for (const item of data.items) {
+      const dataToday = await resToday.json();
+      if (dataToday.items) {
+        rawCount += dataToday.items.length;
+        for (const item of dataToday.items) {
           const title = item.title
             .replace(/<[^>]+>/g, '')
-            .replace(/&amp;/g, '&')
-            .replace(/&quot;/g, '"')
-            .replace(/&lt;/g, '<')
-            .replace(/&gt;/g, '>')
-            .replace(/&apos;/g, "'")
-            .replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c))
+            .replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+            .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c))
             .trim();
-          if (!seenTitles.has(title)) {
-            seenTitles.add(title);
-            allTitles.push(title);
-          }
+          if (!seenToday.has(title)) { seenToday.add(title); todayTitles.push(title); }
+          if (!seenTitles.has(title)) { seenTitles.add(title); allTitles.push(title); }
         }
-      } else {
-        console.log(`[collectBlogTitles] ${keyword} 빈응답:`, JSON.stringify(data).slice(0, 200));
       }
     } catch (e) {
-      console.log(`[collectBlogTitles] ${keyword} 오류:`, e.message);
+      console.log(`[collectBlogTitles] ${keyword} 오늘 오류:`, e.message);
+    }
+
+    await sleep(100);
+    try {
+      // 어제: start=51 (다음 50개)
+      const urlYesterday = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=50&start=51&sort=date`;
+      const resYesterday = await fetch(urlYesterday, {
+        headers: {
+          'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
+          'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
+        },
+      });
+      const dataYesterday = await resYesterday.json();
+      if (dataYesterday.items) {
+        for (const item of dataYesterday.items) {
+          const title = item.title
+            .replace(/<[^>]+>/g, '')
+            .replace(/&amp;/g, '&').replace(/&quot;/g, '"')
+            .replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+            .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c))
+            .trim();
+          if (!seenYesterday.has(title)) { seenYesterday.add(title); yesterdayTitles.push(title); }
+          if (!seenTitles.has(title)) { seenTitles.add(title); allTitles.push(title); }
+        }
+      }
+    } catch (e) {
+      console.log(`[collectBlogTitles] ${keyword} 어제 오류:`, e.message);
     }
   }
 
   const filtered = allTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
-  console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (API응답: ${rawCount}개, 중복제거: ${allTitles.length}개, 노이즈제거: ${filtered.length}개)`);
-  return filtered;
+  const filteredToday = todayTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
+  const filteredYesterday = yesterdayTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
+
+  // 단어 빈도 계산 (2자 이상 한글/영문 단어)
+  const tokenize = titles => {
+    const freq = {};
+    for (const title of titles) {
+      const words = title.match(/[가-힣a-zA-Z0-9]{2,}/g) || [];
+      for (const w of words) {
+        freq[w] = (freq[w] || 0) + 1;
+      }
+    }
+    return freq;
+  };
+
+  const todayFreq = tokenize(filteredToday);
+  const yesterdayFreq = tokenize(filteredYesterday);
+
+  // 오늘 급등 단어 추출 (오늘 빈도 / 어제 빈도 비율 2배 이상 + 오늘 최소 3회)
+  const risingWords = Object.entries(todayFreq)
+    .filter(([word, cnt]) => {
+      if (cnt < 3) return false; // 오늘 최소 3회
+      const yesterday = yesterdayFreq[word] || 0;
+      if (yesterday === 0) return cnt >= 5; // 어제 없었으면 오늘 5회 이상
+      return (cnt / yesterday) >= 2.0; // 2배 이상 급등
+    })
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 30)
+    .map(([word]) => word);
+
+  console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (오늘: ${filteredToday.length}개, 어제: ${filteredYesterday.length}개)`);
+  console.log(`[collectBlogTitles] 급상승 단어 TOP10:`, risingWords.slice(0, 10));
+
+  return { titles: filtered, risingWords };
 }
 
 // ─────────────────────────────────────────
 // Step 2: HyperCLOVA X 키워드 추출
 // ─────────────────────────────────────────
-async function extractTrendKeywords(titles) {
+async function extractTrendKeywords(titles, risingWords = []) {
   const CHUNK_SIZE = 400;
   const allKeywords = [];
+
+  // risingWords 상위 20개를 프롬프트에 힌트로 제공
+  const risingHint = risingWords.length > 0
+    ? `\n\n참고: 오늘 블로그에서 급상승한 단어들이야. 이 단어가 포함된 키워드를 우선적으로 뽑아줘:\n${risingWords.slice(0, 20).join(', ')}`
+    : '';
 
   for (let i = 0; i < Math.min(titles.length, 1600); i += CHUNK_SIZE) {
     const chunk = titles.slice(i, i + CHUNK_SIZE);
@@ -112,7 +176,7 @@ async function extractTrendKeywords(titles) {
 - 모델번호/시리얼 포함 (예: LG휘센 SQ09B9JWBS, 삼성 85인치 QLED TV)
 - 15자 이상 긴 문장 (예: 요즘 많이 신는 데일리 코디 로퍼, 한정판 고야드 중고 2019 생루이 GM)
 - 날짜/연도/이름 단독 (예: 2026년 3월 15일, 2025년 하반기 채니의 일상)
-- 범용어 단독 (예: 홈트레이닝, 다이어트, 맛집, 추천, 후기)
+- 범용어 단독 (예: 홈트레이닝, 다이어트, 맛집, 추천, 후기)${risingHint}
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
@@ -285,9 +349,11 @@ async function getBlogPostCount(keywords) {
         }
       );
       const data = await res.json();
-      return { keyword: kw, total: data.total > 0 ? data.total : 1000 };
+      // API 실패 또는 total 없으면 null (프론트에서 "—" 표시)
+      const total = data.total != null ? data.total : null;
+      return { keyword: kw, total };
     } catch {
-      return { keyword: kw, total: 1000 };
+      return { keyword: kw, total: null };
     }
   }));
 }
@@ -430,10 +496,10 @@ function daysDiff(dateStr) {
 // ─────────────────────────────────────────
 module.exports = async (req, res) => {
   try {
-    const allTitles = await collectBlogTitles();
+    const { titles: allTitles, risingWords } = await collectBlogTitles();
     if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
-    const refined = await extractTrendKeywords(allTitles);
+    const refined = await extractTrendKeywords(allTitles, risingWords);
     if (!refined.length) throw new Error('키워드 추출 실패');
 
     const keywordPool = await updateKeywordPool(refined);
@@ -444,8 +510,11 @@ module.exports = async (req, res) => {
     const poolPostCounts = await getBlogPostCount(poolKeywords);
     const poolPostMap = Object.fromEntries(poolPostCounts.map(p => [p.keyword, p.total]));
 
-    // 50만 초과 제거
-    const filteredPool = poolKeywords.filter(kw => (poolPostMap[kw] || 0) < 500000);
+    // 50만 초과 제거 (null이면 통과)
+    const filteredPool = poolKeywords.filter(kw => {
+      const cnt = poolPostMap[kw];
+      return cnt === null || cnt === undefined || cnt < 500000;
+    });
     console.log(`[preFilter] 50만 초과 제거: ${poolKeywords.length}개 → ${filteredPool.length}개`);
 
     // 중복 제거 (짧은 키워드 우선)
@@ -466,8 +535,9 @@ module.exports = async (req, res) => {
     const rawTrends = await getSearchTrends(dedupedPool);
     if (!rawTrends.length) throw new Error('트렌드 조회 실패');
 
-    const postValues = dedupedPool.map(kw => poolPostMap[kw] || 0);
-    const medianPost = median(postValues);
+    // null 제외하고 medianPost 계산
+    const postValues = dedupedPool.map(kw => poolPostMap[kw]).filter(v => v != null);
+    const medianPost = postValues.length ? median(postValues) : 0;
     const postCountMap = poolPostMap;
     const maxPost = Math.max(...postValues, 1);
     const maxRate = Math.max(...rawTrends.map(t => t.weeklyRate), 1);
@@ -485,7 +555,7 @@ module.exports = async (req, res) => {
       }
       return true;
     }).map(t => {
-      const postCount = postCountMap[t.keyword] || 0;
+      const postCount = postCountMap[t.keyword] ?? null; // null이면 API 실패
       const daysInPool = daysDiff(addedAtMap[t.keyword] || '2026-01-01');
       const newBonus = daysInPool <= 7 ? 0.15 : 0;
 
@@ -566,23 +636,40 @@ module.exports = async (req, res) => {
     await redis.set('top20_pool', JSON.stringify(top20Keywords));
     console.log('[top20_pool] 저장:', top20Keywords.slice(0, 5));
 
-    // 히스토리 누적 (최근 30회)
-    let history = [];
-    try {
-      const raw = await redis.get('trend_history');
-      if (raw) history = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch(e) {}
-    history.push({
-      timestamp: result.updatedAt,
-      keywords: finalRanked.slice(0, 10).map(k => ({
-        keyword: k.keyword,
-        changeRate: Math.round(k.changeRate),
-        risingRate: Math.round(k.risingRate),
-        rank: k.rank,
-      })),
-    });
-    if (history.length > 30) history = history.slice(-30);
-    await redis.set('trend_history', JSON.stringify(history));
+    // 히스토리 저장 - 09:00 기준 날짜별 1개씩 최대 5일치 보관
+    const nowKST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+    const hourKST = nowKST.getUTCHours();
+    const dateStrKST = nowKST.toISOString().slice(0, 10); // YYYY-MM-DD
+
+    // 09:00 리프레시일 때만 날짜 히스토리 업데이트
+    if (hourKST === 9) {
+      let history = [];
+      try {
+        const raw = await redis.get('trend_history');
+        if (raw) history = typeof raw === 'string' ? JSON.parse(raw) : raw;
+      } catch(e) {}
+
+      // 같은 날짜 기존 항목 제거 후 추가
+      history = history.filter(h => h.date !== dateStrKST);
+      history.push({
+        date: dateStrKST,
+        timestamp: result.updatedAt,
+        keywords: finalRanked.slice(0, 10).map(k => ({
+          keyword: k.keyword,
+          changeRate: Math.round(k.changeRate),
+          risingRate: Math.round(k.risingRate),
+          rank: k.rank,
+        })),
+      });
+
+      // 날짜 내림차순 정렬 후 최대 5일치 보관
+      history.sort((a, b) => b.date.localeCompare(a.date));
+      history = history.slice(0, 5);
+      await redis.set('trend_history', JSON.stringify(history));
+      console.log('[trend_history] 날짜별 히스토리 저장:', history.map(h => h.date));
+    } else {
+      console.log('[trend_history] 09:00 아님, 히스토리 저장 스킵 (현재 KST:', hourKST + '시)');
+    }
     res.status(200).json({
       success: true,
       updatedAt: result.updatedAt,
