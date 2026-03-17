@@ -100,13 +100,9 @@ async function collectBlogTitles() {
   const filteredToday = todayTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
   const filteredYesterday = yesterdayTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
 
-  // 단어 빈도 계산 (한글 4자 이상 or 영문+숫자 혼합 2자 이상)
-  const tokenize = titles => {
-    const freq = {};
   // 명사구 단위 빈도 계산 (서술어/형용사 어미 제외)
   const tokenize = titles => {
     const freq = {};
-    // 서술어/형용사 어미로 끝나는 단어 제외 패턴
     const VERB_ENDINGS = /[는은을를이가의에서로도와과만도씩며고면서하고하며하면한할합니다해요했습니다이다이에요]$/;
     const STOP_WORDS = new Set([
       '후기', '추천', '리뷰', '구매', '사용', '소개', '정보', '방법', '이유', '가격',
@@ -115,25 +111,20 @@ async function collectBlogTitles() {
     ]);
 
     for (const title of titles) {
-      // 한글 2자 이상 단어 추출
       const korWords = title.match(/[가-힣]{2,}/g) || [];
       for (const w of korWords) {
         if (STOP_WORDS.has(w)) continue;
-        if (VERB_ENDINGS.test(w)) continue; // 서술어/형용사 제외
+        if (VERB_ENDINGS.test(w)) continue;
         if (/^\d+$/.test(w)) continue;
         freq[w] = (freq[w] || 0) + 1;
       }
-
-      // 영문+숫자 혼합 또는 한글+영문 혼합 (브랜드명/제품명)
       const mixedWords = title.match(/[A-Za-z가-힣][A-Za-z0-9가-힣]{2,}/g) || [];
       for (const w of mixedWords) {
         if (STOP_WORDS.has(w)) continue;
-        if (/^[a-z]/.test(w) && w.length < 4) continue; // 소문자 시작 짧은 단어 제외
+        if (/^[a-z]/.test(w) && w.length < 4) continue;
         freq[w] = (freq[w] || 0) + 1;
       }
     }
-    return freq;
-  };
     return freq;
   };
 
@@ -143,10 +134,10 @@ async function collectBlogTitles() {
   // 오늘 급등 단어 추출 (오늘 빈도 / 어제 빈도 비율 2배 이상 + 오늘 최소 3회)
   const risingWords = Object.entries(todayFreq)
     .filter(([word, cnt]) => {
-      if (cnt < 3) return false; // 오늘 최소 3회
+      if (cnt < 2) return false; // 오늘 최소 2회
       const yesterday = yesterdayFreq[word] || 0;
-      if (yesterday === 0) return cnt >= 5; // 어제 없었으면 오늘 5회 이상
-      return (cnt / yesterday) >= 2.0; // 2배 이상 급등
+      if (yesterday === 0) return cnt >= 3; // 어제 없었으면 오늘 3회 이상
+      return (cnt / yesterday) >= 1.5; // 1.5배 이상 급등
     })
     .sort((a, b) => b[1] - a[1])
     .slice(0, 30)
@@ -201,7 +192,10 @@ async function extractTrendKeywords(titles, risingWords = []) {
 - 모델번호/시리얼 포함 (예: LG휘센 SQ09B9JWBS, 삼성 85인치 QLED TV)
 - 15자 이상 긴 문장 (예: 요즘 많이 신는 데일리 코디 로퍼, 한정판 고야드 중고 2019 생루이 GM)
 - 날짜/연도/이름 단독 (예: 2026년 3월 15일, 2025년 하반기 채니의 일상)
-- 범용어 단독 (예: 홈트레이닝, 다이어트, 맛집, 추천, 후기)${risingHint}
+- 범용어 단독 (예: 홈트레이닝, 다이어트, 맛집, 추천, 후기)
+- 연예인/인물 이름 (예: 이영애, 신봉선, 이휘재, 쯔양) — 반드시 제외
+- TV 프로그램/방송 콘텐츠 (예: 나솔사계, 현역가왕, 나는솔로)
+- 지역 맛집/카페 (예: 경복궁맛집, 을지로 돌판집, 선릉 버터떡 맛집)${risingHint}
 
 반드시 JSON 배열로만, 정확히 15개: ["키워드1","키워드2",...,"키워드15"]
 15개 미만이어도 되지만 15개를 초과하면 절대 안 돼.
@@ -235,12 +229,14 @@ async function extractTrendKeywords(titles, risingWords = []) {
   const seenNorm = new Set();
   // 광고성/노이즈 키워드 패턴
   const NOISE_KW = [
-    /변호사/, /법률/, /법인/, /소송/, /파산/, /이혼/, /형사/, /민사/, /고소/,
-    /성범죄/, /추행/, /그루밍/, /성폭/, /성추행/, /강간/, /음란/, /도촬/,
-    /병원/, /의원/, /클리닉/, /한의원/, /치과/, /성형/, /피부과/,
-    /부동산/, /분양/, /임대/, /매매/, /공인중개/,
+    /변호사/, /법률/, /법인/, /소송/, /파산/, /이혼/, /형사/, /민사/, /고소/, /로펌/,
+    /성범죄/, /추행/, /그루밍/, /성폭/, /성추행/, /강간/, /음란/, /도촬/, /중절/,
+    /병원/, /의원/, /클리닉/, /한의원/, /치과/, /성형/, /피부과/, /시술/,
+    /부동산/, /분양/, /임대/, /매매/, /공인중개/, /가전매입/, /렉카/,
     /줄거리/, /결말/, /등장인물/, /마케팅/, /브랜딩/,
     /추천하는/, /솔직한/, /나만의/, /이야기/, /가능한/, /특별한/,
+    /태교여행/, /육아박스/, /이유식/, /임신초기/,
+    /나솔/, /현역가왕/, /핫딜/, /공매도/, /파산/, /챌린지$/,
   ];
   const filtered = allKeywords.filter(kw => {
     if (typeof kw !== 'string') return false;
