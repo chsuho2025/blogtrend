@@ -103,32 +103,37 @@ async function collectBlogTitles() {
   // 단어 빈도 계산 (한글 4자 이상 or 영문+숫자 혼합 2자 이상)
   const tokenize = titles => {
     const freq = {};
+  // 명사구 단위 빈도 계산 (서술어/형용사 어미 제외)
+  const tokenize = titles => {
+    const freq = {};
+    // 서술어/형용사 어미로 끝나는 단어 제외 패턴
+    const VERB_ENDINGS = /[는은을를이가의에서로도와과만도씩며고면서하고하며하면한할합니다해요했습니다이다이에요]$/;
     const STOP_WORDS = new Set([
-      '지금', '오늘', '내일', '어제', '이번', '요즘', '최근', '많이', '정말', '너무',
-      '진짜', '완전', '드디어', '그냥', '아직', '벌써', '이미', '계속', '항상', '매일',
       '후기', '추천', '리뷰', '구매', '사용', '소개', '정보', '방법', '이유', '가격',
-      '할인', '이벤트', '신상', '신제품', '베스트', '선물', '일기', '분석', '걱정',
-      '변화', '스마트', '필수', '필수템', '찾은', '많은', '좋은', '새로운', '쉬운',
-      '나만의', '이야기', '가능한', '특별한', '다양한', '중요한', '솔직한', '완벽한',
-      '줄거리', '내용', '결말', '리뷰', '총정리', '정리', '꿀팁', '공유', '추천하는',
-      '마케팅', '브랜딩', '관리', '운영', '전략', '방식', '노하우',
+      '할인', '이벤트', '베스트', '정리', '꿀팁', '공유', '마케팅', '브랜딩',
+      'BEST', 'TOP', 'feat',
     ]);
-    // 광고성 패턴 (법률/의료/부동산)
-    const AD_PATTERNS = [
-      /변호사$/, /법률/, /법인/, /소송/, /파산/, /이혼/, /형사/,
-      /병원$/, /의원$/, /클리닉$/, /한의원$/, /치과$/,
-      /부동산/, /아파트/, /분양/, /임대/, /매매/,
-    ];
+
     for (const title of titles) {
-      const words = title.match(/[가-힣]{4,}|[가-힣a-zA-Z0-9]{3,}/g) || [];
-      for (const w of words) {
+      // 한글 2자 이상 단어 추출
+      const korWords = title.match(/[가-힣]{2,}/g) || [];
+      for (const w of korWords) {
         if (STOP_WORDS.has(w)) continue;
+        if (VERB_ENDINGS.test(w)) continue; // 서술어/형용사 제외
         if (/^\d+$/.test(w)) continue;
-        if (/^[A-Z]{1,4}$/.test(w)) continue;
-        if (AD_PATTERNS.some(p => p.test(w))) continue; // 광고성 단어 제외
+        freq[w] = (freq[w] || 0) + 1;
+      }
+
+      // 영문+숫자 혼합 또는 한글+영문 혼합 (브랜드명/제품명)
+      const mixedWords = title.match(/[A-Za-z가-힣][A-Za-z0-9가-힣]{2,}/g) || [];
+      for (const w of mixedWords) {
+        if (STOP_WORDS.has(w)) continue;
+        if (/^[a-z]/.test(w) && w.length < 4) continue; // 소문자 시작 짧은 단어 제외
         freq[w] = (freq[w] || 0) + 1;
       }
     }
+    return freq;
+  };
     return freq;
   };
 
