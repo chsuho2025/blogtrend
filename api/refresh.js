@@ -315,8 +315,8 @@ async function updateKeywordPool(newKeywords) {
     .slice(0, 100);
 
   await redis.set('keyword_pool', JSON.stringify(cleanMerged));
-  console.log(`[updateKeywordPool] pool 크기: ${merged.length} (앵커: ${top20Anchors.length}개, 신규: ${newEntries.length}개)`);
-  return merged;
+  console.log(`[updateKeywordPool] pool 크기: ${cleanMerged.length} (앵커: ${top20Anchors.length}개, 신규: ${newEntries.length}개)`);
+  return cleanMerged;
 }
 
 // ─────────────────────────────────────────
