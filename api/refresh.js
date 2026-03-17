@@ -100,12 +100,23 @@ async function collectBlogTitles() {
   const filteredToday = todayTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
   const filteredYesterday = yesterdayTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
 
-  // 단어 빈도 계산 (2자 이상 한글/영문 단어)
+  // 단어 빈도 계산 (한글 4자 이상 or 영문+숫자 혼합 2자 이상)
   const tokenize = titles => {
     const freq = {};
+    const STOP_WORDS = new Set([
+      '지금', '오늘', '내일', '어제', '이번', '요즘', '최근', '많이', '정말', '너무',
+      '진짜', '완전', '드디어', '그냥', '아직', '벌써', '이미', '계속', '항상', '매일',
+      '후기', '추천', '리뷰', '구매', '사용', '소개', '정보', '방법', '이유', '가격',
+      '할인', '이벤트', '신상', '신제품', '베스트', '선물', '일기', '분석', '걱정',
+      '변화', '스마트', '필수', '필수템', '찾은', '많은', '좋은', '새로운', '쉬운',
+    ]);
     for (const title of titles) {
-      const words = title.match(/[가-힣a-zA-Z0-9]{2,}/g) || [];
+      // 한글 4자 이상, 또는 한글+영문 혼합 3자 이상
+      const words = title.match(/[가-힣]{4,}|[가-힣a-zA-Z0-9]{3,}/g) || [];
       for (const w of words) {
+        if (STOP_WORDS.has(w)) continue;
+        if (/^\d+$/.test(w)) continue; // 숫자만인 것 제외
+        if (/^[A-Z]{1,3}$/.test(w)) continue; // 단독 대문자 약어 제외
         freq[w] = (freq[w] || 0) + 1;
       }
     }
