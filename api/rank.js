@@ -281,6 +281,7 @@ module.exports = async (req, res) => {
         changeRate: Math.round(k.weeklyRate),
         risingRate: Math.round(k.risingRate),
         blogGrowth: k.blogGrowth,
+        hasEnoughData: k.hasEnoughData || false,
         postCount: k.postCount,
         trend: k.trend,
         isNew: prevKeywords.find(p => p.keyword === k.keyword)?.isNew || false,
