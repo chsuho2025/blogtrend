@@ -52,7 +52,6 @@ async function getBlogGrowth(keywords) {
         }
       );
       const data = await res.json();
-      // total이 0이거나 없으면 null (API 실패/파싱 오류로 간주)
       const currentCount = (data.total && data.total > 0) ? data.total : null;
 
       // Redis에서 이전 포스팅 수 히스토리 조회
@@ -62,25 +61,27 @@ async function getBlogGrowth(keywords) {
         if (stored) growthHistory = typeof stored === 'string' ? JSON.parse(stored) : stored;
       } catch(e) {}
 
-      // 24시간 이내 기록만 유지
+      // 48시간 이내 기록만 유지
       const cutoff = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
       growthHistory = growthHistory.filter(h => h.timestamp > cutoff);
 
-      // 새 기록 추가
-      growthHistory.push({ timestamp: now, count: currentCount ?? 0 });
-      await redis.set(`blog_growth:${kw}`, JSON.stringify(growthHistory));
+      // null이 아닐 때만 히스토리에 추가
+      if (currentCount !== null) {
+        growthHistory.push({ timestamp: now, count: currentCount });
+        await redis.set(`blog_growth:${kw}`, JSON.stringify(growthHistory));
+      }
 
       // 블로그 성장률 계산 (최근 1시간 vs 이전 1시간)
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
 
-      const recentRecords = growthHistory.filter(h => h.timestamp >= oneHourAgo);
-      const prevRecords = growthHistory.filter(h => h.timestamp >= twoHoursAgo && h.timestamp < oneHourAgo);
+      const recentRecords = growthHistory.filter(h => h.timestamp >= oneHourAgo && h.count > 0);
+      const prevRecords = growthHistory.filter(h => h.timestamp >= twoHoursAgo && h.timestamp < oneHourAgo && h.count > 0);
 
-      const recentMax = recentRecords.length ? Math.max(...recentRecords.map(h => h.count)) : currentCount;
-      const prevMax = prevRecords.length ? Math.max(...prevRecords.map(h => h.count)) : currentCount;
+      const recentMax = recentRecords.length ? Math.max(...recentRecords.map(h => h.count)) : (currentCount || 0);
+      const prevMax = prevRecords.length ? Math.max(...prevRecords.map(h => h.count)) : 0;
 
-      const blogGrowth = prevMax > 0 ? ((recentMax - prevMax) / prevMax) * 100 : 0;
+      const blogGrowth = (prevMax > 0 && recentMax > 0) ? ((recentMax - prevMax) / prevMax) * 100 : 0;
       const hasEnoughData = growthHistory.length >= 2;
 
       results.push({
