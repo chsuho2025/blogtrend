@@ -1068,7 +1068,7 @@ async function toggleDetail(row, keyword, idx) {
       </div>
       <div class="detail-stat">
         <div class="detail-stat-label">포스팅 수</div>
-        <div class="detail-stat-val gray">${kw?.postCount?.toLocaleString() || '—'}</div>
+        <div class="detail-stat-val gray">${(kw?.postCount && kw.postCount > 0) ? kw.postCount.toLocaleString() : '—'}</div>
       </div>
     </div>
     <button class="posts-btn" onclick="openPostsModal('${keyword.replace(/'/g, "\\'")}', event)">
