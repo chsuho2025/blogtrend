@@ -383,8 +383,8 @@ async function getBlogPostCount(keywords) {
         }
       );
       const data = await res.json();
-      // API 실패 또는 total 없으면 null (프론트에서 "—" 표시)
-      const total = data.total != null ? data.total : null;
+      // total이 0이거나 없으면 null (API 실패로 간주, 프론트에서 "—" 표시)
+      const total = (data.total && data.total > 0) ? data.total : null;
       return { keyword: kw, total };
     } catch {
       return { keyword: kw, total: null };

@@ -52,7 +52,8 @@ async function getBlogGrowth(keywords) {
         }
       );
       const data = await res.json();
-      const currentCount = data.total != null ? data.total : null;
+      // total이 0이거나 없으면 null (API 실패/파싱 오류로 간주)
+      const currentCount = (data.total && data.total > 0) ? data.total : null;
 
       // Redis에서 이전 포스팅 수 히스토리 조회
       let growthHistory = [];
