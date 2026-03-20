@@ -531,6 +531,18 @@
     .kw-detail-stat-val { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; }
     .kw-detail-stat-val.up { color: var(--green); }
     .kw-detail-stat-val.down { color: var(--gray-4); }
+    .kw-detail-posts-section { margin-top: 4px; }
+    .kw-detail-posts-title { font-size: 13px; font-weight: 700; color: var(--gray-2); padding: 12px 0 8px; border-top: 1px solid var(--border); }
+    .kw-detail-post-item {
+      display: flex; flex-direction: column; gap: 3px;
+      padding: 11px 0; border-bottom: 1px solid var(--gray-6);
+      text-decoration: none; transition: opacity .1s;
+    }
+    .kw-detail-post-item:last-child { border-bottom: none; }
+    .kw-detail-post-item:hover { opacity: 0.75; }
+    .kw-detail-post-title { font-size: 13px; font-weight: 600; color: var(--black); line-height: 1.4;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .kw-detail-post-meta { font-size: 11px; color: var(--gray-4); }
     .kw-detail-posts-btn {
       width: 100%; padding: 14px; background: var(--black); color: var(--white);
       border: none; border-radius: 12px; font-size: 15px; font-weight: 700;
@@ -664,7 +676,10 @@
     <div class="kw-detail-body">
       <div class="kw-detail-chart-wrap"><canvas id="kwDetailChart"></canvas></div>
       <div class="kw-detail-stats" id="kwDetailStats"></div>
-      <button class="kw-detail-posts-btn" id="kwDetailPostsBtn">📝 최근 게시글 보기</button>
+      <div class="kw-detail-posts-section">
+        <div class="kw-detail-posts-title">최근 게시글</div>
+        <div id="kwDetailPosts"><div class="modal-loading"><div class="loading-ring" style="width:24px;height:24px;border-width:2px;"></div></div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -1106,8 +1121,9 @@ function openKwDetail(keyword) {
     </div>
   `;
 
-  // 게시글 버튼
-  document.getElementById('kwDetailPostsBtn').onclick = () => openPostsModal(keyword);
+  // 게시글 자동 로드
+  const postsContainer = document.getElementById('kwDetailPosts');
+  postsContainer.innerHTML = '<div class="modal-loading"><div class="loading-ring" style="width:24px;height:24px;border-width:2px;"></div></div>';
 
   modal.classList.add('show');
   document.body.style.overflow = 'hidden';
@@ -1123,6 +1139,27 @@ function openKwDetail(keyword) {
       const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
       return (d.getMonth()+1) + '/' + d.getDate();
     });
+    // 게시글 비동기 로드
+    fetch('/api/posts?keyword=' + encodeURIComponent(keyword) + '&display=20')
+      .then(r => r.json())
+      .then(data => {
+        const posts = data.posts || [];
+        if (!posts.length) {
+          postsContainer.innerHTML = '<div style="padding:12px 0;font-size:13px;color:var(--gray-4);">관련 게시글이 없습니다.</div>';
+          return;
+        }
+        postsContainer.innerHTML = posts.map(p => {
+          const date = p.postdate ? p.postdate.slice(0,4) + '.' + p.postdate.slice(4,6) + '.' + p.postdate.slice(6,8) : '';
+          return '<a class="kw-detail-post-item" href="' + p.link + '" target="_blank" rel="noopener">'
+            + '<div class="kw-detail-post-title">' + p.title + '</div>'
+            + '<div class="kw-detail-post-meta">' + (p.bloggerName || '') + (date ? ' · ' + date : '') + '</div>'
+            + '</a>';
+        }).join('');
+      })
+      .catch(() => {
+        postsContainer.innerHTML = '<div style="padding:12px 0;font-size:13px;color:var(--gray-4);">불러오기 실패</div>';
+      });
+
     kwDetailChartInstance = new Chart(ctx, {
       type: 'line',
       data: {
