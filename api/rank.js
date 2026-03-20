@@ -102,7 +102,7 @@ async function getBlogGrowth(keywords) {
 // ─────────────────────────────────────────
 // Step 2: EMA 스무딩
 // ─────────────────────────────────────────
-const EMA_ALPHA = 0.3;
+const EMA_ALPHA = 0.5; // 0.3 → 0.5: 하락 반영 속도 향상
 
 async function applyEMA(keyword, currentScore) {
   const key = `ema:${keyword}`;
@@ -224,8 +224,9 @@ module.exports = async (req, res) => {
       const normRising = Math.min(Math.max(t.risingRate, 0) / maxRising, 1);
       const normBlog = Math.min(Math.max(t.blogGrowth, 0) / maxBlog, 1);
 
-      // 점수: weeklyRate 45% + risingRate 25% + blogGrowth 20% + newBonus 10%
-      const rawScore = normWeekly * 0.45 + normRising * 0.25 + normBlog * 0.20 + newBonus;
+      // 점수: weeklyRate 35% + risingRate 25% + blogGrowth 30% + newBonus 10%
+      // blogGrowth 비중 상향: 실시간 하락 감지 강화
+      const rawScore = normWeekly * 0.35 + normRising * 0.25 + normBlog * 0.30 + newBonus;
 
       // EMA 스무딩 적용 (메인 랭킹용)
       const emaScore = await applyEMA(t.keyword, rawScore);
