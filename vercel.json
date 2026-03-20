@@ -3,10 +3,6 @@
     {
       "path": "/api/refresh",
       "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/rank",
-      "schedule": "0 * * * *"
     }
   ]
 }
