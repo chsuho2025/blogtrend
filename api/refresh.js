@@ -461,7 +461,17 @@ async function generateComments(topKeywords) {
           messages: [
             {
               role: 'system',
-              content: '아래 번호:키워드 목록에서 각 키워드가 지금 네이버 블로그에서 뜨는 이유를 15자 이내로 설명해. 반드시 JSON 형식으로만 반환: {"0":"이유","1":"이유",...}. 다른 설명 없이 JSON만.',
+              content: `아래 번호:키워드 목록에서 각 키워드가 지금 네이버에서 뜨는 이유를 15자 이내로 설명해.
+규칙:
+- 영화/드라마/게임 제목이면 "~개봉/방영/출시 화제" 형식
+- 연예인 이름이면 "~최근 활동 화제"
+- 식품/음식이면 "~맛집/신메뉴 인기"
+- 제품이면 "~신제품 출시" 또는 "~구매 관심 증가"
+- 트렌드 키워드면 "~유행 중"
+- 절대 키워드 이름을 재해석하거나 임의로 카테고리 붙이지 말 것
+
+반드시 JSON 형식으로만: {"0":"이유","1":"이유",...}
+다른 설명 없이 JSON만.`,
             },
             { role: 'user', content: kwList },
           ],
@@ -590,8 +600,9 @@ module.exports = async (req, res) => {
       return true;
     }).map(t => {
       const postCount = postCountMap[t.keyword] ?? null; // null이면 API 실패
-      const daysInPool = daysDiff(addedAtMap[t.keyword] || '2026-01-01');
-      const newBonus = daysInPool <= 7 ? 0.15 : 0;
+      const addedDate = addedAtMap[t.keyword] || today;
+      const daysInPool = daysDiff(addedDate);
+      const newBonus = daysInPool <= 3 ? 0.15 : 0; // 3일 이내만 신규 보너스
 
       // 점수: 검색량 변화율 60% + 포스팅수 10% + 신규 진입 보너스 15%
       const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
@@ -608,7 +619,7 @@ module.exports = async (req, res) => {
         postCount,
         trend: classifyTrend(t.weeklyRate, t.risingRate, postCount, medianPost),
         values: t.values,
-        isNew: daysInPool <= 7,
+        isNew: daysInPool <= 3, // 3일 이내 진입한 키워드만 NEW
       };
     })
     .sort((a, b) => b.score - a.score);
