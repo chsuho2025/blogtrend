@@ -79,8 +79,6 @@
     .spin { animation: spin .7s linear infinite; display: inline-block; }
 
 
-
-
     /* ── LAYOUT ── */
     .main-wrap {
       max-width: 1160px; margin: 0 auto; padding: 20px 24px;
@@ -179,7 +177,6 @@
       cursor: pointer; white-space: nowrap; flex-shrink: 0; padding: 3px 4px;
     }
 
-    /* ── VIEW TOGGLE ── */
 
     /* ── RANK TABLE ── */
     .rank-header-row {
@@ -253,11 +250,6 @@
     .rank-rate-col.down { color: var(--gray-4); }
     .rank-rate-col.flat { color: var(--gray-4); font-weight: 500; }
 
-    .rank-blog-col {
-      text-align: right; font-size: 12px; font-weight: 600;
-      font-variant-numeric: tabular-nums; color: var(--gray-3);
-    }
-    .rank-blog-col.up { color: var(--green); }
 
     /* 스파크라인 */
     .sparkline-col { display: flex; justify-content: flex-end; align-items: center; }
@@ -317,20 +309,6 @@
 
     /* ── SIDEBAR ── */
 
-    /* Early Trend 카드 */
-
-    .early-item:first-child { border-top: none; }
-    .early-item:hover { background: rgba(45,180,0,0.06); }
-
-    /* TOP5 */
-    .top5-item:first-child { border-top: none; }
-    .top5-item:hover { background: var(--gray-6); }
-
-    /* Rising */
-
-    /* Stats */
-    .stat-cell:nth-child(even) { border-right: none; }
-    .stat-cell:nth-child(-n+2) { border-top: none; }
 
     /* ── FOOTER ── */
     /* ── 게시글 모달 ── */
@@ -669,6 +647,7 @@ let checkedSet = new Set();
 
 let activeCat = 'all';
 let shownEarlyTrends = new Set();
+let selectedTop5Kw = null;
 
 // ── 스파크라인 SVG ──
 function sparkline(values, width=72, height=28, isChecked=false) {
@@ -746,42 +725,15 @@ function fmtHistLabel(iso, date) {
   return `${prefix}${hh}:00`;
 }
 
-// ── 다음 정각까지 시간 ──
-function msUntilNextHour() {
-  const now = new Date();
-  return (60 - now.getMinutes()) * 60 * 1000 - now.getSeconds() * 1000;
-}
-
-// ── 자동 갱신 스케줄 ──
+// ── 다음 업데이트 표시 (하루 1회 0시 갱신) ──
 function scheduleAutoRefresh() {
-  const ms = msUntilNextHour();
-  const nextTime = new Date(Date.now() + ms);
-  document.getElementById('nextUpdate').textContent =
-    `· 다음 ${nextTime.getHours().toString().padStart(2,'0')}:00 업데이트`;
-
-  setTimeout(async () => {
-    try {
-      const res = await fetch('/api/data');
-      if (!res.ok) return;
-      const newData = await res.json();
-      // 열린 패널 기억 후 바로 적용
-      const openPanel = document.querySelector('.detail-panel.open');
-      const openKeyword = openPanel
-        ? openPanel.closest('.rank-item-wrap')?.querySelector('.kw-name')?.textContent
-        : null;
-      renderAll(newData);
-      if (openKeyword) {
-        const idx = globalKws.findIndex(k => k.keyword === openKeyword);
-        if (idx >= 0) {
-          const row = document.querySelector(`#panel-${idx}`)?.previousElementSibling;
-          if (row) setTimeout(() => toggleDetail(row, openKeyword, idx), 100);
-        }
-      }
-    } catch(e) {}
-    scheduleAutoRefresh();
-  }, ms);
+  const now = new Date();
+  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+  const tomorrow = new Date(kstNow);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+  document.getElementById('nextUpdate').textContent = '· 매일 00:00 업데이트';
 }
-
 
 
 // ── 데이터 로드 ──
@@ -882,7 +834,7 @@ function buildMainContent() {
       <div class="card-header">
         <div>
           <div class="card-title">실시간 랭킹</div>
-          <div class="card-sub">네이버 블로그 트렌드 TOP 10</div>
+          <div class="card-sub">네이버 블로그 트렌드 TOP 20</div>
         </div>
 
       </div>
@@ -1173,8 +1125,6 @@ function setupCatTabs() {
 }
 
 // ── 범례 ──
-// 선택된 TOP5 키워드 (peak 하이라이트용)
-let selectedTop5Kw = null;
 
 function buildLegend(kws) {
   const container = document.getElementById('chartLegend');
@@ -1183,7 +1133,7 @@ function buildLegend(kws) {
   container.innerHTML = top5.map((kw) => {
     const isSelected = selectedTop5Kw === kw.keyword;
     // peak 시점 계산
-    const vals = kw.values || [];
+    const vals = (kw.scoreValues && kw.scoreValues.length > 1) ? kw.scoreValues : (kw.values || []);
     const peakIdx = vals.length ? vals.indexOf(Math.max(...vals)) : -1;
     const peakDaysAgo = peakIdx >= 0 ? vals.length - 1 - peakIdx : -1;
     const peakLabel = peakDaysAgo === 0 ? '오늘 최고점'
@@ -1259,7 +1209,6 @@ function drawChart(days) {
   });
 
 
-
   chartInstance = new Chart(ctx, {
     type: 'line',
     data: { labels, datasets },
@@ -1290,7 +1239,7 @@ function drawChart(days) {
 
 // ── period tabs ──
 function setupPeriodTabs() {
-  document.querySelectorAll('.tab-btn').forEach(btn => {
+  document.querySelectorAll('.tab-btn:not(.tab-btn-disabled)').forEach(btn => {
     btn.onclick = () => {
       document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
       btn.classList.add('active');
