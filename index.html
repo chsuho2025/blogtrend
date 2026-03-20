@@ -957,7 +957,7 @@ function buildRankRows(kws) {
         </div>
         <div class="detail-panel" id="panel-${i}"></div>
       </div>`;
-  }).join('');
+  }
 
   // 10위까지만 우선 표시, 11~20위는 더보기로
   const top10 = filtered.slice(0, 10);
