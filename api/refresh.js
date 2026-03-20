@@ -445,16 +445,50 @@ async function polishKeywords(keywords) {
 // ─────────────────────────────────────────
 // Step 7: 코멘트 생성
 // ─────────────────────────────────────────
+async function fetchBlogContent(keyword) {
+  // 키워드로 블로그 검색해서 제목+본문요약 3개 가져오기
+  try {
+    const res = await fetch(
+      `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=3&sort=sim`,
+      {
+        headers: {
+          'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
+          'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
+        },
+      }
+    );
+    const data = await res.json();
+    if (!data.items) return [];
+    return data.items.map(item => {
+      const title = item.title.replace(/<[^>]+>/g, '').trim();
+      const desc = item.description.replace(/<[^>]+>/g, '').trim();
+      return `${title}: ${desc}`;
+    });
+  } catch {
+    return [];
+  }
+}
+
 async function generateComments(topKeywords, allTitles = []) {
-  // 각 키워드별 관련 블로그 제목 3개 추출
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // 각 키워드별 블로그 본문 내용 병렬 수집
+  const contentResults = await Promise.all(
+    topKeywords.map(async (k, idx) => {
+      await sleep(idx * 80); // 80ms 간격으로 분산
+      const posts = await fetchBlogContent(k.keyword);
+      return posts;
+    })
+  );
+
+  // 키워드 + 관련글 제목 + 본문요약 조합
   const kwWithContext = topKeywords.map((k, i) => {
-    const norm = k.keyword.replace(/\s+/g, '').toLowerCase();
-    const related = allTitles
-      .filter(t => t.replace(/\s+/g, '').toLowerCase().includes(norm))
-      .slice(0, 3);
-    const context = related.length > 0 ? ` (관련글: ${related.join(' / ')})` : '';
+    const posts = contentResults[i];
+    const context = posts.length > 0
+      ? '\n  참고:\n' + posts.map(p => `  - ${p}`).join('\n')
+      : '';
     return `${i}:${k.keyword}${context}`;
-  }).join('\n');
+  }).join('\n\n');
 
   try {
     const res = await fetch(
@@ -470,22 +504,23 @@ async function generateComments(topKeywords, allTitles = []) {
           messages: [
             {
               role: 'system',
-              content: `아래는 네이버 블로그 트렌드 키워드와 관련 게시글 제목이야.
-각 키워드가 지금 왜 뜨는지 관련 게시글을 참고해서 15자 이내로 설명해.
+              content: `아래는 네이버 블로그 트렌드 키워드와 실제 블로그 게시글 내용이야.
+각 키워드가 지금 왜 뜨는지 게시글 내용을 반드시 참고해서 15자 이내로 설명해.
 
 규칙:
-- 관련글 내용을 반드시 참고해서 정확하게 설명할 것
+- 게시글 내용을 읽고 정확하게 파악할 것
 - 영화/드라마/게임이면 "~개봉/방영/출시 화제"
-- 신제품이면 "~신제품 출시 관심"
-- 식품이면 "~맛집/신메뉴 인기"
-- 절대 키워드 이름만 보고 임의로 해석하지 말 것
+- 신제품이면 "~신제품 출시 관심"  
+- 식품/맛집이면 "~맛집/신메뉴 인기"
+- 이벤트면 "~이벤트 화제"
+- 절대 키워드 이름만 보고 추측하지 말 것
 
 반드시 JSON 형식으로만: {"0":"설명","1":"설명",...}
 다른 설명 없이 JSON만.`,
             },
             { role: 'user', content: kwWithContext },
           ],
-          maxCompletionTokens: 800,
+          maxCompletionTokens: 1000,
           temperature: 0.3,
           repetitionPenalty: 1.1,
           thinking: { effort: 'none' },
