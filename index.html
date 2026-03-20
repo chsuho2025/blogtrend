@@ -170,15 +170,6 @@
     }
 
     /* ── VIEW TOGGLE ── */
-    .view-toggle {
-      display: flex; background: var(--gray-6); border-radius: 7px; padding: 2px;
-    }
-    .view-btn {
-      padding: 4px 10px; border-radius: 5px; font-size: 11px; font-weight: 600;
-      cursor: pointer; color: var(--gray-3); background: none; border: none;
-      font-family: 'Pretendard', sans-serif; transition: all .15s;
-    }
-    .view-btn.active { background: var(--white); color: var(--black); box-shadow: 0 1px 3px rgba(0,0,0,.07); }
 
     /* ── RANK TABLE ── */
     .rank-header-row {
@@ -658,7 +649,7 @@ let globalData = null;
 
 let activeHistoryIdx = -1;
 let checkedSet = new Set();
-let viewMode = localStorage.getItem('btr_viewMode') || 'compact';
+
 let activeCat = 'all';
 let shownEarlyTrends = new Set();
 
@@ -928,12 +919,7 @@ function buildMainContent() {
           <div class="card-title">실시간 랭킹</div>
           <div class="card-sub">네이버 블로그 트렌드 TOP 10</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center;">
-          <div class="view-toggle">
-            <button class="view-btn ${viewMode==='compact'?'active':''}" onclick="setViewMode('compact')">컴팩트</button>
-            <button class="view-btn ${viewMode==='detail'?'active':''}" onclick="setViewMode('detail')">상세</button>
-          </div>
-        </div>
+
       </div>
       ${hasCategory ? `
       <div class="cat-tabs" id="catTabs">
@@ -970,7 +956,7 @@ function buildRankRows(kws) {
     const numCls = kw.rank===1?'top1':kw.rank===2?'top2':kw.rank===3?'top3':'';
     const isChecked = selectedTop5Kw === kw.keyword;
     const accentColor = isChecked ? 'var(--green)' : (kw.rank <= 3 ? 'var(--gray-2)' : 'var(--gray-5)');
-    const accentH = viewMode === 'compact' ? '22px' : '28px';
+
 
     const badges = [
       kw.isEarlyTrend ? '<span class="badge badge-early">🚀 조기감지</span>' : '',
@@ -979,46 +965,27 @@ function buildRankRows(kws) {
       kw.trend === '유행지남' ? '<span class="badge badge-down">하락세</span>' : '',
     ].filter(Boolean).join('');
 
-    const blogStr = kw.blogGrowth > 0 ? `+${kw.blogGrowth}%` : kw.blogGrowth < -5 ? `${kw.blogGrowth}%` : '—';
-    const blogCls = kw.blogGrowth > 0 ? 'up' : '';
 
-    const compact = `
-      <div class="rank-row${isChecked?' open':''}" onclick="toggleDetail(this, '${kw.keyword.replace(/'/g,"\\'")}', ${i})">
-        <div class="rank-num-wrap">
-          <div class="rank-num ${numCls}">${kw.rank}</div>
-          ${deltaHtml(kw.rank, kw.prevRank, kw.isNew)}
-        </div>
-        <div class="rank-kw-col">
-          <div class="rank-accent" style="background:${accentColor};height:${accentH}"></div>
-          <div class="kw-inner">
-            <div class="kw-name">${kw.keyword}</div>
-            ${kw.comment ? `<div class="kw-comment">${kw.comment}</div>` : ''}
-          </div>
-        </div>
-        ${rateHtml(kw.changeRate)}
-        <div class="sparkline-col">${sparkline(kw.values, 72, 28, isChecked)}</div>
-      </div>`;
-
-    const detail = `
-      <div class="rank-row detail-view${isChecked?' open':''}" onclick="toggleDetail(this, '${kw.keyword.replace(/'/g,"\\'")}', ${i})">
-        <div class="rank-num-wrap">
-          <div class="rank-num ${numCls}">${kw.rank}</div>
-          ${deltaHtml(kw.rank, kw.prevRank, kw.isNew)}
-        </div>
-        <div class="rank-kw-col">
-          <div class="rank-accent" style="background:${accentColor};height:${accentH}"></div>
-          <div class="kw-inner">
-            <div class="kw-name">${kw.keyword}</div>
-            ${kw.comment ? `<div class="kw-comment">${kw.comment}</div>` : ''}
-            <div class="kw-badges">${badges}</div>
-          </div>
-        </div>
-        ${rateHtml(kw.changeRate)}
-      </div>`;
+    const risingStr = kw.risingRate > 0 ? `+${Math.round(kw.risingRate)}%` : kw.risingRate < 0 ? `${Math.round(kw.risingRate)}%` : '—';
 
     return `
       <div class="rank-item-wrap">
-        ${viewMode === 'compact' ? compact : detail}
+        <div class="rank-row${isChecked?' open':''}" onclick="toggleDetail(this, '${kw.keyword.replace(/'/g,"\\'")}', ${i})">
+          <div class="rank-num-wrap">
+            <div class="rank-num ${numCls}">${kw.rank}</div>
+            ${deltaHtml(kw.rank, kw.prevRank, kw.isNew)}
+          </div>
+          <div class="rank-kw-col">
+            <div class="rank-accent" style="background:${accentColor};height:28px"></div>
+            <div class="kw-inner">
+              <div class="kw-name">${kw.keyword}</div>
+              ${kw.comment ? `<div class="kw-comment">${kw.comment}</div>` : ''}
+              <div class="kw-badges">${badges}</div>
+            </div>
+          </div>
+          ${rateHtml(kw.changeRate)}
+          <div class="sparkline-col">${sparkline(kw.values, 72, 28, isChecked)}</div>
+        </div>
         <div class="detail-panel" id="panel-${i}"></div>
       </div>`;
   }).join('');
