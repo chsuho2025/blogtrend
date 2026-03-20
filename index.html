@@ -1027,11 +1027,8 @@ async function toggleDetail(row, keyword, idx) {
         <div class="detail-stat-val ${kw?.changeRate > 0 ? 'up' : 'gray'}">${kw?.changeRate > 0 ? '+' : ''}${kw?.changeRate || 0}%</div>
       </div>
       <div class="detail-stat">
-        <div class="detail-stat-label">블로그 증가 <span style="font-size:10px;color:var(--gray-4)">(1시간)</span></div>
-        ${!kw?.hasEnoughData
-          ? '<div class="detail-stat-val gray" style="font-size:11px;color:var(--gray-4)">수집 중...</div>'
-          : `<div class="detail-stat-val ${kw.blogGrowth > 0 ? 'up' : kw.blogGrowth < 0 ? 'down' : 'gray'}">${kw.blogGrowth > 0 ? '+' : ''}${kw.blogGrowth}%</div>`
-        }
+        <div class="detail-stat-label">급상승률 <span style="font-size:10px;color:var(--gray-4)">(3일)</span></div>
+        <div class="detail-stat-val ${kw?.risingRate > 0 ? 'up' : 'gray'}">${kw?.risingRate > 0 ? '+' : ''}${Math.round(kw?.risingRate || 0)}%</div>
       </div>
       <div class="detail-stat">
         <div class="detail-stat-label">포스팅 수 <span style="font-size:10px;color:var(--gray-4)">(누적)</span></div>
