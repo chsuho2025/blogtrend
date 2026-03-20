@@ -233,6 +233,7 @@
     .badge-hot   { color: #C62828; background: #FFEBEE; }
     .badge-up    { color: var(--green); background: var(--green-dim); }
     .badge-down  { color: var(--gray-4); background: var(--gray-6); }
+    .badge-surge { color: #1565C0; background: #E3F2FD; }
 
     .rank-rate-col {
       text-align: right; font-size: 13px; font-weight: 700;
@@ -489,6 +490,58 @@
     .hist-item-kws { font-size: 11px; color: var(--gray-3); margin-top: 2px; }
     .hist-item-arrow { font-size: 12px; color: var(--gray-4); }
 
+    /* ── 키워드 상세 모달 ── */
+    .kw-detail-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.5); z-index: 350;
+      align-items: flex-end; justify-content: center;
+      padding: 0;
+    }
+    .kw-detail-overlay.show { display: flex; }
+    .kw-detail-box {
+      background: var(--white); width: 100%; max-width: 680px;
+      max-height: 88vh; border-radius: 20px 20px 0 0;
+      display: flex; flex-direction: column;
+      box-shadow: 0 -4px 32px rgba(0,0,0,0.15);
+      animation: slideUp .3s ease;
+    }
+    .kw-detail-handle {
+      width: 36px; height: 4px; background: var(--gray-5);
+      border-radius: 2px; margin: 12px auto 0;
+    }
+    .kw-detail-header {
+      padding: 16px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .kw-detail-kw { font-size: 20px; font-weight: 900; letter-spacing: -0.5px; }
+    .kw-detail-desc { font-size: 13px; color: var(--gray-3); margin-top: 4px; }
+    .kw-detail-body { overflow-y: auto; flex: 1; padding: 16px 20px; }
+    .kw-detail-body::-webkit-scrollbar { width: 4px; }
+    .kw-detail-body::-webkit-scrollbar-thumb { background: var(--gray-5); border-radius: 2px; }
+    .kw-detail-chart-wrap { height: 180px; margin-bottom: 16px; }
+    .kw-detail-stats {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 12px; margin-bottom: 16px;
+    }
+    .kw-detail-stat {
+      background: var(--gray-6); border-radius: 10px; padding: 12px;
+    }
+    .kw-detail-stat-label { font-size: 11px; color: var(--gray-3); font-weight: 600; margin-bottom: 4px; }
+    .kw-detail-stat-val { font-size: 18px; font-weight: 900; letter-spacing: -0.5px; }
+    .kw-detail-stat-val.up { color: var(--green); }
+    .kw-detail-stat-val.down { color: var(--gray-4); }
+    .kw-detail-posts-btn {
+      width: 100%; padding: 14px; background: var(--black); color: var(--white);
+      border: none; border-radius: 12px; font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: 'Pretendard', sans-serif;
+      transition: opacity .15s;
+    }
+    .kw-detail-posts-btn:hover { opacity: 0.85; }
+    @media (min-width: 600px) {
+      .kw-detail-box { border-radius: 20px; max-height: 80vh; margin: auto; }
+    }
+
     footer { max-width: 1160px; margin: 0 auto; padding: 16px 24px 36px; display: flex; align-items: center; justify-content: space-between; }
     .footer-left { font-size: 11px; color: var(--gray-4); }
     .footer-tags { display: flex; gap: 5px; }
@@ -581,12 +634,6 @@
       <div id="top5List"></div>
     </div>
 
-    <!-- Rising -->
-    <div class="card">
-      <div class="card-header"><div><div class="card-title">급상승</div><div class="card-sub">최근 3일 기준</div></div></div>
-      <div id="risingList" style="padding:4px 0;"></div>
-    </div>
-
     <!-- Stats -->
     <div class="card">
       <div class="card-header"><div class="card-title">현황</div></div>
@@ -596,6 +643,28 @@
         <div class="stat-cell"><div class="stat-label">1위 키워드</div><div class="stat-val sm" id="stat-top">—</div><div class="stat-sub">현재 1위</div></div>
         <div class="stat-cell"><div class="stat-label">조기감지</div><div class="stat-val sm green" id="stat-early">—</div><div class="stat-sub">개</div></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- 키워드 상세 모달 -->
+<div class="kw-detail-overlay" id="kwDetailModal" onclick="closeKwDetail(event)">
+  <div class="kw-detail-box">
+    <div class="kw-detail-handle"></div>
+    <div class="kw-detail-header">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div class="kw-detail-kw" id="kwDetailName">—</div>
+          <div class="kw-detail-desc" id="kwDetailDesc">—</div>
+        </div>
+        <button class="modal-close" onclick="closeKwDetail()">✕</button>
+      </div>
+      <div id="kwDetailBadges" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"></div>
+    </div>
+    <div class="kw-detail-body">
+      <div class="kw-detail-chart-wrap"><canvas id="kwDetailChart"></canvas></div>
+      <div class="kw-detail-stats" id="kwDetailStats"></div>
+      <button class="kw-detail-posts-btn" id="kwDetailPostsBtn">📝 최근 게시글 보기</button>
     </div>
   </div>
 </div>
@@ -872,11 +941,7 @@ function renderAll(data) {
     </div>`).join('');
 
   // Rising
-  document.getElementById('risingList').innerHTML = rising.slice(0,5).map((kw,i) => `
-    <div class="rising-item">
-      <div class="rising-left"><span class="rising-num">${i+1}</span><span class="rising-kw">${kw.keyword}</span></div>
-      <span class="rising-rate">▲${kw.risingRate}%</span>
-    </div>`).join('') || '<div style="padding:16px 20px;font-size:13px;color:var(--gray-3);">데이터 없음</div>';
+
 
   document.getElementById('sidebar').style.display = 'flex';
 
@@ -960,6 +1025,7 @@ function buildRankRows(kws) {
 
     const badges = [
       kw.isEarlyTrend ? '<span class="badge badge-early">🚀 조기감지</span>' : '',
+      kw.blogSurge ? '<span class="badge badge-surge">📈 포스팅급등</span>' : '',
       kw.risingRate >= 80 ? '<span class="badge badge-hot">HOT</span>' : '',
       kw.trend === '유행중' && !kw.isEarlyTrend ? '<span class="badge badge-up">유행중</span>' : '',
       kw.trend === '유행지남' ? '<span class="badge badge-down">하락세</span>' : '',
@@ -999,49 +1065,104 @@ function buildRankRows(kws) {
   return rows + endMsg;
 }
 
-// ── 상세 패널 토글 ──
-async function toggleDetail(row, keyword, idx) {
-  const panel = document.getElementById(`panel-${idx}`);
-  const isOpen = panel.classList.contains('open');
+// ── 키워드 상세 모달 ──
+let kwDetailChartInstance = null;
 
-  document.querySelectorAll('.detail-panel.open').forEach(p => p.classList.remove('open'));
-  document.querySelectorAll('.rank-row.open').forEach(r => r.classList.remove('open'));
+function toggleDetail(row, keyword, idx) {
+  openKwDetail(keyword);
+}
 
-  if (isOpen) return;
-
-  panel.classList.add('open');
-  row.classList.add('open');
-
-  // 카드 클릭은 차트와 무관 (차트는 TOP5 고정)
-
-  if (panel.dataset.loaded) return;
-
+function openKwDetail(keyword) {
   const kw = globalKws.find(k => k.keyword === keyword);
+  if (!kw) return;
 
-  // 상세 패널 내부 구성
-  panel.innerHTML = `
-    <div class="detail-chart-wrap"><canvas id="detail-chart-${idx}"></canvas></div>
-    <div class="detail-stats">
-      <div class="detail-stat">
-        <div class="detail-stat-label">검색 변화 <span style="font-size:10px;color:var(--gray-4)">(7일)</span></div>
-        <div class="detail-stat-val ${kw?.changeRate > 0 ? 'up' : 'gray'}">${kw?.changeRate > 0 ? '+' : ''}${kw?.changeRate || 0}%</div>
-      </div>
-      <div class="detail-stat">
-        <div class="detail-stat-label">급상승률 <span style="font-size:10px;color:var(--gray-4)">(3일)</span></div>
-        <div class="detail-stat-val ${kw?.risingRate > 0 ? 'up' : 'gray'}">${kw?.risingRate > 0 ? '+' : ''}${Math.round(kw?.risingRate || 0)}%</div>
-      </div>
-      <div class="detail-stat">
-        <div class="detail-stat-label">포스팅 수 <span style="font-size:10px;color:var(--gray-4)">(누적)</span></div>
-        <div class="detail-stat-val gray">${(kw?.postCount && kw.postCount > 0) ? kw.postCount.toLocaleString() : '—'}</div>
-      </div>
+  const modal = document.getElementById('kwDetailModal');
+  document.getElementById('kwDetailName').textContent = kw.keyword;
+  document.getElementById('kwDetailDesc').textContent = kw.comment || '';
+
+  // 배지
+  const badges = [
+    kw.isEarlyTrend ? '<span class="badge badge-early">🚀 조기감지</span>' : '',
+    kw.blogSurge ? '<span class="badge badge-surge">📈 포스팅급등</span>' : '',
+    kw.risingRate >= 80 ? '<span class="badge badge-hot">HOT</span>' : '',
+    kw.trend === '유행중' ? '<span class="badge badge-up">유행중</span>' : '',
+    kw.trend === '유행지남' ? '<span class="badge badge-down">하락세</span>' : '',
+  ].filter(Boolean).join('');
+  document.getElementById('kwDetailBadges').innerHTML = badges;
+
+  // 통계
+  document.getElementById('kwDetailStats').innerHTML = `
+    <div class="kw-detail-stat">
+      <div class="kw-detail-stat-label">검색 변화 (7일)</div>
+      <div class="kw-detail-stat-val ${kw.changeRate > 0 ? 'up' : 'down'}">${kw.changeRate > 0 ? '+' : ''}${kw.changeRate}%</div>
     </div>
-    <button class="posts-btn" onclick="openPostsModal('${keyword.replace(/'/g, "\\'")}', event)">
-      📝 최근 게시글 보기
-    </button>
+    <div class="kw-detail-stat">
+      <div class="kw-detail-stat-label">급상승률 (3일)</div>
+      <div class="kw-detail-stat-val ${kw.risingRate > 0 ? 'up' : 'down'}">${kw.risingRate > 0 ? '+' : ''}${Math.round(kw.risingRate)}%</div>
+    </div>
+    <div class="kw-detail-stat">
+      <div class="kw-detail-stat-label">포스팅 수</div>
+      <div class="kw-detail-stat-val">${(kw.postCount && kw.postCount > 0) ? kw.postCount.toLocaleString() : '—'}${kw.blogSurge ? '<span style="font-size:11px;color:var(--green);display:block;">+' + kw.blogSurgeRate + '%↑</span>' : ''}</div>
+    </div>
   `;
 
+  // 게시글 버튼
+  document.getElementById('kwDetailPostsBtn').onclick = () => openPostsModal(keyword);
+
+  modal.classList.add('show');
+  document.body.style.overflow = 'hidden';
+
+  // 차트 그리기
+  setTimeout(() => {
+    if (kwDetailChartInstance) { kwDetailChartInstance.destroy(); kwDetailChartInstance = null; }
+    const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
+    if (!ctx || !kw.values) return;
+    const days = 28;
+    const values = kw.values.length >= days ? kw.values.slice(-days) : [...Array(days - kw.values.length).fill(0), ...kw.values];
+    const labels = Array.from({length: days}, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
+      return (d.getMonth()+1) + '/' + d.getDate();
+    });
+    kwDetailChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          data: values,
+          borderColor: '#2DB400',
+          backgroundColor: 'rgba(45,180,0,0.08)',
+          borderWidth: 2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+          tension: 0.4,
+          fill: true,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false }, tooltip: {
+          backgroundColor: '#fff', borderColor: '#E8E8E8', borderWidth: 1,
+          titleColor: '#111', bodyColor: '#555',
+          titleFont: { family: 'Pretendard', size: 11 },
+          bodyFont: { family: 'Pretendard', size: 11 }, padding: 8,
+        }},
+        scales: {
+          x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { color: '#E8E8E8' } },
+          y: { min: 0, max: 110, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, stepSize: 25, callback: v => v <= 100 ? v + '%' : '' }, border: { color: '#E8E8E8' } }
+        }
+      }
+    });
+  }, 50);
+}
+
+function closeKwDetail(e) {
+  if (e && e.target !== document.getElementById('kwDetailModal')) return;
+  document.getElementById('kwDetailModal').classList.remove('show');
+  document.body.style.overflow = '';
+  if (kwDetailChartInstance) { kwDetailChartInstance.destroy(); kwDetailChartInstance = null; }
+}
+
   // 상세 차트 그리기
-  if (kw?.values) drawDetailChart(idx, kw);
 
   panel.dataset.loaded = '1';
 }
@@ -1339,11 +1460,8 @@ function openHistModal() {
 }
 
 function selectHistory(idx) {
-  activeHistoryIdx = idx;
+  // 히스토리 팝업은 단순 기록 열람용 - 차트 전환 없음
   closeHistModal();
-  rebuildHistoryTabs();
-  const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
-  drawChart(activeDays);
 }
 
 function closeHistModal(e) {
@@ -1357,6 +1475,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closePostsModal();
     closeHistModal();
+    closeKwDetail();
   }
 });
 
