@@ -690,15 +690,7 @@ module.exports = async (req, res) => {
 
     console.log('[blogSurge] 급등 키워드:', Object.keys(postHistoryMap));
 
-    const ranked = rawTrends.filter(t => {
-      // 최근 7일 평균 검색량이 너무 낮으면 제외 (분모가 작아서 변화율이 뻥튀기되는 문제 방지)
-      const recent7avg = avg(t.values.slice(-7));
-      if (recent7avg < 1.0) {
-        console.log(`[ranked] 검색량 낮아 제외: ${t.keyword} (7일평균 ${recent7avg.toFixed(2)})`);
-        return false;
-      }
-      return true;
-    }).map(t => {
+    const ranked = rawTrends.map(t => {
       const postCount = postCountMap[t.keyword] ?? null;
       const addedDate = addedAtMap[t.keyword] || today;
       const daysInPool = daysDiff(addedDate);
