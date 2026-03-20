@@ -1162,11 +1162,6 @@ function closeKwDetail(e) {
   if (kwDetailChartInstance) { kwDetailChartInstance.destroy(); kwDetailChartInstance = null; }
 }
 
-  // 상세 차트 그리기
-
-  panel.dataset.loaded = '1';
-}
-
 // ── 게시글 모달 ──
 async function openPostsModal(keyword, e) {
   if (e) e.stopPropagation();
@@ -1212,60 +1207,6 @@ function closePostsModal(e) {
   if (e && e.target !== document.getElementById('postsModal')) return;
   document.getElementById('postsModal').classList.remove('show');
   document.body.style.overflow = '';
-}
-
-function drawDetailChart(idx, kw) {
-  const ctx = document.getElementById(`detail-chart-${idx}`)?.getContext('2d');
-  if (!ctx) return;
-  const days = 28;
-  const values = kw.values || [];
-  const raw = values.length >= days ? values.slice(-days) : [...Array(days - values.length).fill(0), ...values];
-  const labels = Array.from({length: days}, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
-    return `${d.getMonth()+1}/${d.getDate()}`;
-  });
-
-  new Chart(ctx, {
-    type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        data: raw,
-        borderColor: '#2DB400',
-        backgroundColor: 'rgba(45,180,0,0.08)',
-        borderWidth: 2,
-        pointRadius: 0,
-        pointHoverRadius: 4,
-        tension: 0.4,
-        fill: true,
-      }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      layout: { padding: { top: 4, bottom: 4 } },
-      plugins: { legend: { display: false }, tooltip: {
-        backgroundColor: '#fff', borderColor: '#E8E8E8', borderWidth: 1,
-        titleColor: '#111', bodyColor: '#555',
-        titleFont: { family: 'Pretendard', size: 11 },
-        bodyFont: { family: 'Pretendard', size: 11 }, padding: 8,
-      }},
-      scales: {
-        x: { grid: { display: false }, ticks: { color: '#AAAAAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { display: false } },
-        y: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAAAAA', font: { size: 10, family: 'Pretendard' } }, border: { display: false } }
-      }
-    }
-  });
-}
-
-// ── 뷰 모드 ──
-function setViewMode(mode) {
-  viewMode = mode;
-  localStorage.setItem('btr_viewMode', mode);
-  const rankList = document.getElementById('rankList');
-  if (rankList) rankList.innerHTML = buildRankRows(globalKws);
-  document.querySelectorAll('.view-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.textContent.includes(mode === 'compact' ? '컴팩트' : '상세'));
-  });
 }
 
 // ── 카테고리 탭 ──
