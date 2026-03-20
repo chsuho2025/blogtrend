@@ -126,18 +126,18 @@ function detectEarlyTrend(trends, postCountMap) {
     .filter(v => v > 0)
     .sort((a, b) => a - b);
 
-  const p50 = percentile(indices, 50); // P30 → P50으로 완화
+  const p70 = percentile(indices, 70); // P50 → P70으로 완화 (조기감지 더 잘 잡히게)
 
   return trends.map(t => {
     const currentIndex = avg(t.values.slice(-7));
     const isEarlyTrend = (
-      t.risingRate >= 100 &&          // 200% → 100%로 완화
-      currentIndex <= p50 &&           // P30 → P50으로 완화 (중간 이하면 아직 초기)
+      t.risingRate >= 80 &&            // 100% → 80%로 추가 완화
+      currentIndex <= p70 &&           // P50 → P70으로 완화
       currentIndex > 0 &&
-      t.weeklyRate >= -10             // 약간의 하락도 허용
+      t.weeklyRate >= -10
     );
 
-    const novelty = p50 > 0 ? Math.max(0, 1 - (currentIndex / p50)) : 0;
+    const novelty = p70 > 0 ? Math.max(0, 1 - (currentIndex / p70)) : 0;
     const earlyScore = isEarlyTrend
       ? (Math.min(t.risingRate / 300, 1)) * 0.6
         + (Math.min(Math.max(t.weeklyRate, 0) / 100, 1)) * 0.2
