@@ -15,7 +15,6 @@ module.exports = async (req, res) => {
 
     const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
 
-    // 구형 데이터 호환성: 없는 필드 기본값 채우기
     const normalized = {
       updatedAt: data.updatedAt || new Date().toISOString(),
       rankUpdatedAt: data.rankUpdatedAt || data.updatedAt || new Date().toISOString(),
@@ -28,7 +27,11 @@ module.exports = async (req, res) => {
         changeRate: k.changeRate || 0,
         risingRate: k.risingRate || 0,
         blogGrowth: k.blogGrowth || 0,
-        postCount: k.postCount || 0,
+        hasEnoughData: k.hasEnoughData || false,
+        postCount: k.postCount || null,
+        blogSurgeRate: k.blogSurgeRate || 0,
+        blogSurge: k.blogSurge || false,
+        category: k.category || '',
         trend: k.trend || '유행중',
         isNew: k.isNew || false,
         isEarlyTrend: k.isEarlyTrend || false,
@@ -40,7 +43,6 @@ module.exports = async (req, res) => {
       earlyTrends: data.earlyTrends || [],
     };
 
-    // detail=1이면 히스토리 포함
     const url = req.url || '';
     const isDetail = url.includes('detail=1');
     if (isDetail) {

@@ -158,29 +158,28 @@ async function extractTrendKeywords(titles, risingWords = []) {
             messages: [
               {
                 role: 'system',
-                content: `너는 네이버 DataLab 트렌드 분석가야.
-아래 블로그 제목들에서 "네이버 DataLab에서 검색량이 실제로 잡힐 만한 키워드" 15개만 뽑아줘.
+                content: `너는 네이버 DataLab 트렌드 키워드 선별 전문가야.
+아래 블로그 제목들에서 "지금 전국민이 네이버에서 검색하는 트렌드 키워드" 15개만 뽑아줘.
+반드시 15개 이하로만 뽑아. 15개를 초과하면 절대 안 돼.
 
-뽑아야 할 것 (DataLab에서 검색량 있는 것):
-- 전국민이 검색하는 제품명/음식명 (예: 황치즈칩, 상하이버터떡, 닌텐도 스위치)
+뽑아야 할 것:
+- 전국민이 검색하는 제품명/음식명 (예: 황치즈칩, 버터떡, 닌텐도 스위치, 에브리봇)
 - 브랜드+카테고리 (예: 자라 봄신상, 스타벅스 신메뉴, 메가커피 봄신메뉴)
-- 트렌드어/챌린지 (예: 갓생루틴, 무지출챌린지)
+- 지금 막 뜨는 트렌드어 (예: 갓생루틴, 무지출챌린지, 두바이 찰떡파이)
+- 영화/드라마/게임 타이틀 (예: 아카데미 시상식, 케이팝 데몬 헌터스)
 
 절대 뽑지 말 것:
-- 동네 가게 이름 (예: 동탄 학폭 변호사, 하남 애견미용 어서오시개, 효창공원역 카페 사우스, 노원맛집 썸머타이)
-- 지역+직종/업종 (예: 광주 변호사, 상개동 중등과외, 강제추행 처벌)
-- 특정인 1회성 콘텐츠 (예: 유인나 귀걸이, 넷플릭스 시리즈 월간남친, 나는솔로 22기 영숙)
-- 모델번호/시리얼 포함 (예: LG휘센 SQ09B9JWBS, 삼성 85인치 QLED TV)
-- 15자 이상 긴 문장 (예: 요즘 많이 신는 데일리 코디 로퍼, 한정판 고야드 중고 2019 생루이 GM)
-- 날짜/연도/이름 단독 (예: 2026년 3월 15일, 2025년 하반기 채니의 일상)
-- 범용어 단독 (예: 홈트레이닝, 다이어트, 맛집, 추천, 후기)
-- 연예인/인물 이름 (예: 이영애, 신봉선, 이휘재, 쯔양) — 반드시 제외
-- TV 프로그램/방송 콘텐츠 (예: 나솔사계, 현역가왕, 나는솔로)
-- 지역 맛집/카페 (예: 경복궁맛집, 을지로 돌판집, 선릉 버터떡 맛집)
-- 단독 단어 (예: 화이트, 가지, 스마트, 분위기, 직장인, 드라마, 우리, 비교)
+- 연예인/인물 이름 (예: 이영애, 신봉선, 이휘재, 쯔양, 장영란, 한소희, 장원영)
+- 방송 프로그램/회차 (예: 나솔사계, 현역가왕3, 나는솔로 22기, 나솔 30기)
+- 법률/의료/부동산 광고 (예: 손해배상변호사, 그루밍성범죄, 파주성범죄로펌, 강남변호사)
+- 지역 상호명/맛집 (예: 선릉 버터떡 맛집, 경복궁맛집 푸페또클럽, 을지로 돌판집)
+- 모델번호/시리얼 (예: LG휘센 SQ09B9JWBS, NT930X5JK82S, LG 15인치 놀라운생각)
+- 범용어 단독 (예: 다이어트, 홈트레이닝, 영등포, 가디건, 인테리어, 맛집, 후기)
+- 날짜/채용/일정 (예: 2026년 3월 15일, 2026 CJ제일제당 채용)
+- 블로그 제목 그대로 (예: 선릉 버터떡 맛집 후기 다녀왔어요)
+- 단독 단어 (예: 화이트, 스마트, 분위기, 직장인, 드라마, 비교)
 
-반드시 JSON 배열로만, 정확히 15개: ["키워드1","키워드2",...,"키워드15"]
-15개 미만이어도 되지만 15개를 초과하면 절대 안 돼.
+반드시 JSON 배열로만, 15개 이하: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
               },
               {
@@ -393,7 +392,7 @@ async function getBlogPostCount(keywords) {
 }
 
 // ─────────────────────────────────────────
-// Step 6: 키워드 정제 (사용자 노출용 표기 정규화)
+// Step 6: 키워드 정제 + 카테고리 분류
 // ─────────────────────────────────────────
 async function polishKeywords(keywords) {
   const kwList = keywords.map((k, i) => `${i}:${k}`).join('\n');
@@ -412,20 +411,22 @@ async function polishKeywords(keywords) {
             {
               role: 'system',
               content: `아래는 네이버 블로그 트렌드 키워드 목록이야.
-각 키워드를 사용자가 보기 편하게 다듬어줘.
+각 키워드를 다듬고 카테고리도 분류해줘.
 
 규칙:
-- 붙어있는 합성어는 자연스러운 띄어쓰기로 교정 (예: 갓생루틴 → 갓생 루틴)
-- 고유명사, 브랜드명, 제품명은 절대 쪼개지 마 (예: 황치즈칩 → 황치즈칩, 버터떡 → 버터떡, 오뚜기 진밀면 → 오뚜기 진밀면)
-- 이미 자연스러운 것은 절대 바꾸지 마
-- 앞뒤 불필요한 특수문자만 제거
+- 붙어있는 합성어는 자연스럽게 띄어쓰기 (예: 갓생루틴 → 갓생 루틴)
+- 고유명사/브랜드명/제품명은 절대 쪼개지 마
+- 이미 자연스러운 것은 바꾸지 마
 
-반드시 JSON으로만: {"0":"정제된키워드","1":"정제된키워드",...}
+카테고리는 반드시 아래 6가지 중 하나:
+FOOD(음식/식품/음료), FASHION(패션/의류/잡화), BEAUTY(뷰티/화장품/스킨케어), TECH(테크/가전/IT), LIFE(생활/육아/인테리어), ENTER(엔터/문화/이벤트/스포츠)
+
+반드시 JSON으로만: {"0":{"name":"정제된키워드","category":"FOOD"},...}
 다른 설명 없이 JSON만.`,
             },
             { role: 'user', content: kwList },
           ],
-          maxCompletionTokens: 800,
+          maxCompletionTokens: 1000,
           temperature: 0.1,
           repetitionPenalty: 1.0,
           thinking: { effort: 'none' },
@@ -435,10 +436,12 @@ async function polishKeywords(keywords) {
     const data = await res.json();
     const text = data.result?.message?.content || '{}';
     const polished = JSON.parse(text.replace(/```json|```/g, '').trim());
-    return keywords.map((kw, i) => polished[String(i)] || kw);
+    const names = keywords.map((kw, i) => polished[String(i)]?.name || kw);
+    const categories = keywords.map((kw, i) => polished[String(i)]?.category || '');
+    return { names, categories };
   } catch (e) {
     console.log('[polishKeywords] 실패, 원본 유지:', e.message);
-    return keywords;
+    return { names: keywords, categories: keywords.map(() => '') };
   }
 }
 
@@ -642,6 +645,51 @@ module.exports = async (req, res) => {
       keywordPool.map(item => [item.keyword, item.addedAt || '2026-01-01'])
     );
 
+    // ── 포스팅 급등 알고리즘 (blogSurge) ──
+    // 어제 포스팅 수와 비교해서 급등 키워드 감지
+    const postHistoryMap = {};
+    await Promise.all(dedupedPool.map(async (kw) => {
+      const postCount = poolPostMap[kw];
+      if (!postCount) return;
+      try {
+        const histKey = `post_history:${kw}`;
+        let hist = [];
+        const stored = await redis.get(histKey);
+        if (stored) hist = typeof stored === 'string' ? JSON.parse(stored) : stored;
+
+        // 30일 이상 된 기록 제거
+        const cutoff = new Date();
+        cutoff.setDate(cutoff.getDate() - 30);
+        const cutoffStr = cutoff.toISOString().slice(0, 10);
+        hist = hist.filter(h => h.date >= cutoffStr);
+
+        // 어제 포스팅 수
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = yesterday.toISOString().slice(0, 10);
+        const yesterdayEntry = hist.find(h => h.date === yesterdayStr);
+        const yesterdayCount = yesterdayEntry?.count || 0;
+
+        // blogSurgeRate 계산
+        let blogSurgeRate = 0;
+        if (yesterdayCount >= 500 && postCount > yesterdayCount) {
+          blogSurgeRate = ((postCount - yesterdayCount) / yesterdayCount) * 100;
+        }
+
+        // 오늘 기록 추가
+        hist = hist.filter(h => h.date !== today);
+        hist.push({ date: today, count: postCount });
+        await redis.set(histKey, JSON.stringify(hist));
+
+        if (blogSurgeRate >= 20) {
+          postHistoryMap[kw] = { blogSurgeRate: Math.round(blogSurgeRate), yesterdayCount };
+          console.log(`[blogSurge] 급등 감지: ${kw} (+${Math.round(blogSurgeRate)}%, ${yesterdayCount}→${postCount})`);
+        }
+      } catch(e) {}
+    }));
+
+    console.log('[blogSurge] 급등 키워드:', Object.keys(postHistoryMap));
+
     const ranked = rawTrends.filter(t => {
       // 최근 7일 평균 검색량이 너무 낮으면 제외 (분모가 작아서 변화율이 뻥튀기되는 문제 방지)
       const recent7avg = avg(t.values.slice(-7));
@@ -651,16 +699,19 @@ module.exports = async (req, res) => {
       }
       return true;
     }).map(t => {
-      const postCount = postCountMap[t.keyword] ?? null; // null이면 API 실패
+      const postCount = postCountMap[t.keyword] ?? null;
       const addedDate = addedAtMap[t.keyword] || today;
       const daysInPool = daysDiff(addedDate);
-      const newBonus = daysInPool <= 3 ? 0.15 : 0; // 3일 이내만 신규 보너스
+      const newBonus = daysInPool <= 3 ? 0.15 : 0;
+      const surge = postHistoryMap[t.keyword];
+      const blogSurgeRate = surge?.blogSurgeRate || 0;
+      const blogSurgeBonus = blogSurgeRate >= 20 ? 0.15 : blogSurgeRate >= 10 ? 0.08 : 0;
 
-      // 점수: 검색량 변화율 60% + 포스팅수 10% + 신규 진입 보너스 15%
       const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
       const risingScore = t.risingRate > 0 ? (t.risingRate / maxRising) * 0.3 : 0;
-      const score = (t.weeklyRate / maxRate) * 0.55
+      const score = (t.weeklyRate / maxRate) * 0.50
         + risingScore
+        + blogSurgeBonus
         + newBonus;
 
       return {
@@ -669,9 +720,11 @@ module.exports = async (req, res) => {
         changeRate: t.weeklyRate,
         risingRate: t.risingRate,
         postCount,
+        blogSurgeRate,
+        blogSurge: blogSurgeRate >= 20,
         trend: classifyTrend(t.weeklyRate, t.risingRate, postCount, medianPost),
         values: t.values,
-        isNew: daysInPool <= 3, // 3일 이내 진입한 키워드만 NEW
+        isNew: daysInPool <= 3,
       };
     })
     .sort((a, b) => b.score - a.score);
@@ -694,10 +747,13 @@ module.exports = async (req, res) => {
     });
     console.log('[신규 키워드]', finalRanked.filter(k => k.isNew).map(k => k.keyword));
 
-    // 키워드 정제
-    const polishedNames = await polishKeywords(finalRanked.map(k => k.keyword));
+    // 키워드 정제 + 카테고리 분류
+    const { names: polishedNames, categories } = await polishKeywords(finalRanked.map(k => k.keyword));
     console.log('[polishKeywords] 정제 결과:', polishedNames.slice(0, 5));
-    finalRanked.forEach((k, i) => { k.keyword = polishedNames[i]; });
+    finalRanked.forEach((k, i) => {
+      k.keyword = polishedNames[i];
+      k.category = categories[i] || '';
+    });
 
     // 코멘트 생성 (관련 블로그 제목 포함)
     const commentsRaw = await generateComments(finalRanked.slice(0, 10), allTitles);
@@ -710,7 +766,11 @@ module.exports = async (req, res) => {
         keyword: k.keyword,
         score: Math.round(k.score * 100),
         changeRate: Math.round(k.changeRate),
+        risingRate: Math.round(k.risingRate),
         postCount: k.postCount,
+        blogSurgeRate: k.blogSurgeRate || 0,
+        blogSurge: k.blogSurge || false,
+        category: k.category || '',
         trend: k.trend,
         isNew: k.isNew,
         comment: comments[i] || '',
@@ -721,6 +781,7 @@ module.exports = async (req, res) => {
         keyword: k.keyword,
         risingRate: Math.round(k.risingRate),
         postCount: k.postCount,
+        blogSurge: k.blogSurge || false,
         trend: k.trend,
         isNew: k.isNew,
       })),
@@ -740,31 +801,31 @@ module.exports = async (req, res) => {
       '다이어트', '홈트레이닝', '맛집', '후기', '추천', '버터떡',
     ]);
     const top20Keywords = finalRanked
+      .filter(k => {
+        // 하락세 키워드 앵커 제외 (risingRate < -20 AND weeklyRate < -10)
+        if (k.risingRate < -20 && k.changeRate < -10) {
+          console.log('[top20_pool] 하락세 제외:', k.keyword, `(rising:${Math.round(k.risingRate)}%, weekly:${Math.round(k.changeRate)}%)`);
+          return false;
+        }
+        return true;
+      })
       .map(k => k.keyword)
       .filter(kw => {
         if (TOP20_STOP.has(kw)) return false;
         if (TOP20_NOISE.some(p => p.test(kw))) return false;
-        // 2자 이하 단어 제외
         if (kw.replace(/\s/g, '').length <= 2) return false;
         return true;
       });
     await redis.set('top20_pool', JSON.stringify(top20Keywords));
     console.log('[top20_pool] 저장:', top20Keywords.slice(0, 5));
 
-    // 히스토리 저장 - 09:00 기준 날짜별 1개씩 최대 5일치 보관
+    // 히스토리 저장 - 0시 1회 cron이므로 항상 저장, 최대 30일치
     const nowKST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
-    const hourKST = nowKST.getUTCHours();
-    const dateStrKST = nowKST.toISOString().slice(0, 10); // YYYY-MM-DD
-
-    // 09:00 리프레시일 때만 날짜 히스토리 업데이트
-    if (hourKST === 9) {
+    const dateStrKST = nowKST.toISOString().slice(0, 10);
+    try {
       let history = [];
-      try {
-        const raw = await redis.get('trend_history');
-        if (raw) history = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      } catch(e) {}
-
-      // 같은 날짜 기존 항목 제거 후 추가
+      const raw = await redis.get('trend_history');
+      if (raw) history = typeof raw === 'string' ? JSON.parse(raw) : raw;
       history = history.filter(h => h.date !== dateStrKST);
       history.push({
         date: dateStrKST,
@@ -774,16 +835,15 @@ module.exports = async (req, res) => {
           changeRate: Math.round(k.changeRate),
           risingRate: Math.round(k.risingRate),
           rank: k.rank,
+          blogSurge: k.blogSurge || false,
         })),
       });
-
-      // 날짜 내림차순 정렬 후 최대 5일치 보관
       history.sort((a, b) => b.date.localeCompare(a.date));
-      history = history.slice(0, 5);
+      history = history.slice(0, 30); // 5일 → 30일
       await redis.set('trend_history', JSON.stringify(history));
-      console.log('[trend_history] 날짜별 히스토리 저장:', history.map(h => h.date));
-    } else {
-      console.log('[trend_history] 09:00 아님, 히스토리 저장 스킵 (현재 KST:', hourKST + '시)');
+      console.log('[trend_history] 저장:', dateStrKST, '/ 누적:', history.length + '일치');
+    } catch(e) {
+      console.log('[trend_history] 저장 실패:', e.message);
     }
     res.status(200).json({
       success: true,

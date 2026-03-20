@@ -120,28 +120,29 @@ async function applyEMA(keyword, currentScore) {
 // ─────────────────────────────────────────
 // Step 3: Early Trend 감지
 // ─────────────────────────────────────────
-function detectEarlyTrend(trends, postCountMap) {
+function detectEarlyTrend(trends) {
   const indices = trends
     .map(t => avg(t.values.slice(-7)))
     .filter(v => v > 0)
     .sort((a, b) => a - b);
 
-  const p70 = percentile(indices, 70); // P50 → P70으로 완화 (조기감지 더 잘 잡히게)
+  const p70 = percentile(indices, 70);
 
   return trends.map(t => {
     const currentIndex = avg(t.values.slice(-7));
-    const isEarlyTrend = (
-      t.risingRate >= 80 &&            // 100% → 80%로 추가 완화
-      currentIndex <= p70 &&           // P50 → P70으로 완화
-      currentIndex > 0 &&
-      t.weeklyRate >= -10
-    );
+    // DataLab 신호: 검색량 급상승 + 아직 중간 이하
+    const datalabSignal = t.risingRate >= 50 && currentIndex <= p70 && currentIndex > 0;
+    // 블로그 신호: 포스팅 수 급등 (refresh에서 계산된 값)
+    const blogSignal = (t.blogSurgeRate || 0) >= 20 && (t.postCount || 0) >= 500;
+    // 둘 중 하나라도 있으면 조기감지
+    const isEarlyTrend = (datalabSignal || blogSignal) && t.weeklyRate >= -10;
 
     const novelty = p70 > 0 ? Math.max(0, 1 - (currentIndex / p70)) : 0;
     const earlyScore = isEarlyTrend
-      ? (Math.min(t.risingRate / 300, 1)) * 0.6
+      ? (Math.min(t.risingRate / 300, 1)) * 0.5
         + (Math.min(Math.max(t.weeklyRate, 0) / 100, 1)) * 0.2
         + novelty * 0.2
+        + (blogSignal ? 0.1 : 0)
       : 0;
 
     return { ...t, isEarlyTrend, earlyScore: Math.round(earlyScore * 100) };
@@ -204,6 +205,9 @@ module.exports = async (req, res) => {
       values: k.values || [],
       postCount: blogMap[k.keyword]?.postCount || k.postCount || 0,
       blogGrowth: blogMap[k.keyword]?.blogGrowth || 0,
+      blogSurgeRate: k.blogSurgeRate || 0, // refresh에서 계산된 급등률
+      blogSurge: k.blogSurge || false,
+      category: k.category || '',
     }));
 
     const maxWeekly = Math.max(...rawTrends.map(t => t.weeklyRate), 1);
@@ -211,7 +215,7 @@ module.exports = async (req, res) => {
     const maxBlog = Math.max(...rawTrends.map(t => Math.max(t.blogGrowth, 0)), 1);
 
     // Step 3: Early Trend 감지
-    const trendsWithEarly = detectEarlyTrend(rawTrends, blogMap);
+    const trendsWithEarly = detectEarlyTrend(rawTrends);
 
     // Step 4: EMA 적용 + 점수 계산
     const scored = await Promise.all(trendsWithEarly.map(async (t) => {
@@ -271,8 +275,8 @@ module.exports = async (req, res) => {
     const rankUpdatedAt = new Date().toISOString();
 
     const result = {
-      updatedAt: prevData.updatedAt,       // 수집 시간 (하루 3회)
-      rankUpdatedAt,                         // 랭킹 업데이트 시간 (매시간)
+      updatedAt: prevData.updatedAt,
+      rankUpdatedAt,
       collectUpdatedAt: prevData.updatedAt,
       keywords: finalRanked.map((k, i) => ({
         rank: i + 1,
@@ -284,6 +288,9 @@ module.exports = async (req, res) => {
         blogGrowth: k.blogGrowth,
         hasEnoughData: k.hasEnoughData || false,
         postCount: k.postCount,
+        blogSurgeRate: k.blogSurgeRate || 0,
+        blogSurge: k.blogSurge || false,
+        category: k.category || prevKeywords.find(p => p.keyword === k.keyword)?.category || '',
         trend: k.trend,
         isNew: prevKeywords.find(p => p.keyword === k.keyword)?.isNew || false,
         isEarlyTrend: k.isEarlyTrend,
@@ -296,6 +303,7 @@ module.exports = async (req, res) => {
         keyword: k.keyword,
         risingRate: Math.round(k.risingRate),
         blogGrowth: k.blogGrowth,
+        blogSurge: k.blogSurge || false,
         trend: k.trend,
         isEarlyTrend: k.isEarlyTrend,
       })),
@@ -303,6 +311,7 @@ module.exports = async (req, res) => {
         keyword: k.keyword,
         risingRate: Math.round(k.risingRate),
         blogGrowth: k.blogGrowth,
+        blogSurge: k.blogSurge || false,
         earlyScore: k.earlyScore,
         changeRate: Math.round(k.weeklyRate),
       })),
