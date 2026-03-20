@@ -838,6 +838,7 @@ module.exports = async (req, res) => {
           blogSurge: k.blogSurge || false,
         })),
       });
+      history = history.filter(h => h.date); // date 없는 구형 항목 제거
       history.sort((a, b) => b.date.localeCompare(a.date));
       history = history.slice(0, 30); // 5일 → 30일
       await redis.set('trend_history', JSON.stringify(history));
