@@ -445,8 +445,17 @@ async function polishKeywords(keywords) {
 // ─────────────────────────────────────────
 // Step 7: 코멘트 생성
 // ─────────────────────────────────────────
-async function generateComments(topKeywords) {
-  const kwList = topKeywords.map((k, i) => `${i}:${k.keyword}`).join(', ');
+async function generateComments(topKeywords, allTitles = []) {
+  // 각 키워드별 관련 블로그 제목 3개 추출
+  const kwWithContext = topKeywords.map((k, i) => {
+    const norm = k.keyword.replace(/\s+/g, '').toLowerCase();
+    const related = allTitles
+      .filter(t => t.replace(/\s+/g, '').toLowerCase().includes(norm))
+      .slice(0, 3);
+    const context = related.length > 0 ? ` (관련글: ${related.join(' / ')})` : '';
+    return `${i}:${k.keyword}${context}`;
+  }).join('\n');
+
   try {
     const res = await fetch(
       'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
@@ -461,22 +470,23 @@ async function generateComments(topKeywords) {
           messages: [
             {
               role: 'system',
-              content: `아래 번호:키워드 목록에서 각 키워드가 지금 네이버에서 뜨는 이유를 15자 이내로 설명해.
-규칙:
-- 영화/드라마/게임 제목이면 "~개봉/방영/출시 화제" 형식
-- 연예인 이름이면 "~최근 활동 화제"
-- 식품/음식이면 "~맛집/신메뉴 인기"
-- 제품이면 "~신제품 출시" 또는 "~구매 관심 증가"
-- 트렌드 키워드면 "~유행 중"
-- 절대 키워드 이름을 재해석하거나 임의로 카테고리 붙이지 말 것
+              content: `아래는 네이버 블로그 트렌드 키워드와 관련 게시글 제목이야.
+각 키워드가 지금 왜 뜨는지 관련 게시글을 참고해서 15자 이내로 설명해.
 
-반드시 JSON 형식으로만: {"0":"이유","1":"이유",...}
+규칙:
+- 관련글 내용을 반드시 참고해서 정확하게 설명할 것
+- 영화/드라마/게임이면 "~개봉/방영/출시 화제"
+- 신제품이면 "~신제품 출시 관심"
+- 식품이면 "~맛집/신메뉴 인기"
+- 절대 키워드 이름만 보고 임의로 해석하지 말 것
+
+반드시 JSON 형식으로만: {"0":"설명","1":"설명",...}
 다른 설명 없이 JSON만.`,
             },
-            { role: 'user', content: kwList },
+            { role: 'user', content: kwWithContext },
           ],
           maxCompletionTokens: 800,
-          temperature: 0.5,
+          temperature: 0.3,
           repetitionPenalty: 1.1,
           thinking: { effort: 'none' },
         }),
@@ -647,8 +657,8 @@ module.exports = async (req, res) => {
     console.log('[polishKeywords] 정제 결과:', polishedNames.slice(0, 5));
     finalRanked.forEach((k, i) => { k.keyword = polishedNames[i]; });
 
-    // 코멘트 생성
-    const commentsRaw = await generateComments(finalRanked.slice(0, 10));
+    // 코멘트 생성 (관련 블로그 제목 포함)
+    const commentsRaw = await generateComments(finalRanked.slice(0, 10), allTitles);
     const comments = finalRanked.slice(0, 10).map((_, i) => commentsRaw[String(i)] || '');
 
     const result = {
