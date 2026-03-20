@@ -112,6 +112,16 @@
       font-family: 'Pretendard', sans-serif; transition: all .15s;
     }
     .tab-btn:hover { color: var(--black); }
+    .tab-btn-disabled {
+      opacity: 0.35 !important; cursor: not-allowed !important; pointer-events: auto !important;
+    }
+    .tab-btn-disabled:hover::after {
+      content: attr(title);
+      position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
+      background: var(--black); color: var(--white); font-size: 11px; font-weight: 500;
+      padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 100;
+    }
+    .tab-btn { position: relative; }
     .tab-btn.active {
       background: var(--white); color: var(--black); font-weight: 700;
       box-shadow: 0 1px 3px rgba(0,0,0,0.08);
@@ -499,6 +509,15 @@
       .kw-detail-box { border-radius: 20px; max-height: 80vh; margin: auto; }
     }
 
+    .rank-more-btn {
+      width: 100%; padding: 14px; border: none; background: var(--gray-6);
+      color: var(--gray-3); font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: 'Pretendard', sans-serif;
+      transition: background .15s, color .15s;
+      border-top: 1px solid var(--gray-5);
+    }
+    .rank-more-btn:hover { background: var(--gray-5); color: var(--black); }
+
     footer { max-width: 1160px; margin: 0 auto; padding: 16px 24px 36px; display: flex; align-items: center; justify-content: space-between; }
     .footer-left { font-size: 11px; color: var(--gray-4); }
     .footer-tags { display: flex; gap: 5px; }
@@ -839,13 +858,13 @@ function buildMainContent() {
     <div class="card">
       <div class="card-header">
         <div>
-          <div class="card-title">TOP 5 BTR Score</div>
+          <div class="card-title">TOP 5 트렌드 지수</div>
           <div class="card-sub">BTR 자체 점수 기준 추이 (데이터 누적 시 시계열 표시)</div>
         </div>
         <div class="tab-group" id="periodTabs">
           <button class="tab-btn active" data-days="7">1주</button>
-          <button class="tab-btn" data-days="14">2주</button>
-          <button class="tab-btn" data-days="28">4주</button>
+          <button class="tab-btn tab-btn-disabled" data-days="14" title="서비스 준비 중입니다" onclick="return false;">2주</button>
+          <button class="tab-btn tab-btn-disabled" data-days="28" title="서비스 준비 중입니다" onclick="return false;">4주</button>
         </div>
       </div>
       <div class="chart-section">
@@ -878,8 +897,8 @@ function buildMainContent() {
       </div>` : ''}
       <div class="rank-header-row">
         <span>순위</span><span>키워드</span>
-        <span style="text-align:right">BTR Score</span>
         <span style="text-align:right">검색변화</span>
+        <span style="text-align:right">트렌드 지수</span>
         <span style="text-align:right">추세</span>
       </div>
       <div id="rankList">${buildRankRows(kws)}</div>
@@ -887,6 +906,10 @@ function buildMainContent() {
 
   `;
 
+  // 초기 1위 선택
+  if (!selectedTop5Kw && kws.length > 0) {
+    selectedTop5Kw = kws[0].keyword;
+  }
   buildLegend(kws);
   drawChart(7);
   setupPeriodTabs();
@@ -899,12 +922,12 @@ function buildRankRows(kws) {
   const filtered = activeCat === 'all' ? kws : kws.filter(k => k.category === activeCat);
   if (!filtered.length) return `<div style="padding:40px;text-align:center;color:var(--gray-3);font-size:13px;">해당 카테고리 데이터가 없어요</div>`;
 
-  const rows = filtered.slice(0, 10).map((kw, i) => {
+  const rows = '';
+
+  function buildRow(kw, i) {
     const numCls = kw.rank===1?'top1':kw.rank===2?'top2':kw.rank===3?'top3':'';
     const isChecked = selectedTop5Kw === kw.keyword;
     const accentColor = isChecked ? 'var(--green)' : (kw.rank <= 3 ? 'var(--gray-2)' : 'var(--gray-5)');
-
-
     const badges = [
       kw.isEarlyTrend ? '<span class="badge badge-early">🚀 조기감지</span>' : '',
       kw.blogSurge ? '<span class="badge badge-surge">📈 포스팅급등</span>' : '',
@@ -912,10 +935,7 @@ function buildRankRows(kws) {
       kw.trend === '유행중' && !kw.isEarlyTrend ? '<span class="badge badge-up">유행중</span>' : '',
       kw.trend === '유행지남' ? '<span class="badge badge-down">하락세</span>' : '',
     ].filter(Boolean).join('');
-
-
-    const risingStr = kw.risingRate > 0 ? `+${Math.round(kw.risingRate)}%` : kw.risingRate < 0 ? `${Math.round(kw.risingRate)}%` : '—';
-
+    const risingStr = kw.risingRate > 0 ? '+' + Math.round(kw.risingRate) + '%' : kw.risingRate < 0 ? Math.round(kw.risingRate) + '%' : '—';
     return `
       <div class="rank-item-wrap">
         <div class="rank-row${isChecked?' open':''}" onclick="toggleDetail(this, '${kw.keyword.replace(/'/g,"\\'")}', ${i})">
@@ -939,17 +959,34 @@ function buildRankRows(kws) {
       </div>`;
   }).join('');
 
-  const endMsg = filtered.length < 20 ? `
-    <div class="empty-end">
-      <div class="empty-end-title">더 이상 트렌드가 없어요</div>
-      <div class="empty-end-desc">데이터가 쌓이면 더 많은 키워드가 표시됩니다</div>
+  // 10위까지만 우선 표시, 11~20위는 더보기로
+  const top10 = filtered.slice(0, 10);
+  const rest = filtered.slice(10, 20);
+
+  const top10Rows = top10.map((kw, i) => buildRow(kw, i)).join('');
+  const restRows = rest.map((kw, i) => buildRow(kw, i + 10)).join('');
+
+  const showMoreBtn = rest.length > 0 ? `
+    <div id="rankMoreWrap">
+      <div id="rankRestRows" style="display:none;">${restRows}</div>
+      <button class="rank-more-btn" id="rankMoreBtn" onclick="toggleRankMore()">+ 더보기 (${rest.length}개 더)</button>
     </div>` : '';
 
-  return rows + endMsg;
+  return top10Rows + showMoreBtn;
 }
 
 // ── 키워드 상세 모달 ──
 let kwDetailChartInstance = null;
+
+function toggleRankMore() {
+  const wrap = document.getElementById('rankRestRows');
+  const btn = document.getElementById('rankMoreBtn');
+  if (!wrap || !btn) return;
+  const isOpen = wrap.style.display !== 'none';
+  wrap.style.display = isOpen ? 'none' : 'block';
+  const restCount = wrap.querySelectorAll('.rank-item-wrap').length;
+  btn.textContent = isOpen ? `+ 더보기 (${restCount}개 더)` : '▲ 가리기';
+}
 
 function toggleDetail(row, keyword, idx) {
   openKwDetail(keyword);
@@ -1002,7 +1039,7 @@ function openKwDetail(keyword) {
     const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
     if (!ctx || !kw.values) return;
     const days = 28;
-    // scoreValues 사용 (BTR Score 시계열)
+    // scoreValues 사용 (트렌드 지수 시계열)
     const scoreArr = kw.scoreValues && kw.scoreValues.length > 1
       ? kw.scoreValues
       : [kw.score || 0];
@@ -1193,7 +1230,7 @@ function drawChart(days) {
   });
 
   const datasets = sourceKws.map((kw, i) => {
-    // scoreValues 사용 (BTR Score 시계열), 없으면 현재 score 단일값
+    // scoreValues 사용 (트렌드 지수 시계열), 없으면 현재 score 단일값
     const scoreRaw = kw.scoreValues && kw.scoreValues.length > 1
       ? kw.scoreValues.slice(-days)
       : Array(days).fill(null).map((_, j) => j === days - 1 ? (kw.score || 0) : null);
