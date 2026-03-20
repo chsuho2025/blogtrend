@@ -84,7 +84,7 @@
     /* ── LAYOUT ── */
     .main-wrap {
       max-width: 1160px; margin: 0 auto; padding: 20px 24px;
-      display: grid; grid-template-columns: 1fr 320px; gap: 20px; align-items: start;
+      display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start;
     }
     .left-col { display: flex; flex-direction: column; gap: 16px; }
 
@@ -173,7 +173,7 @@
 
     /* ── RANK TABLE ── */
     .rank-header-row {
-      display: grid; grid-template-columns: 40px 1fr 80px 72px;
+      display: grid; grid-template-columns: 40px 1fr 80px 80px 72px;
       padding: 8px 20px; font-size: 10px; color: var(--gray-4);
       font-weight: 700; letter-spacing: 0.3px; text-transform: uppercase;
       border-bottom: 1px solid var(--gray-6);
@@ -185,7 +185,7 @@
 
     /* 컴팩트 뷰 */
     .rank-row {
-      display: grid; grid-template-columns: 40px 1fr 80px 72px;
+      display: grid; grid-template-columns: 40px 1fr 80px 80px 72px;
       padding: 11px 20px; align-items: center; cursor: pointer; transition: background .1s;
     }
     .rank-row:hover { background: var(--gray-6); }
@@ -306,76 +306,21 @@
     .state-text { font-size: 13px; color: var(--gray-3); }
 
     /* ── SIDEBAR ── */
-    .sidebar { display: flex; flex-direction: column; gap: 14px; }
 
     /* Early Trend 카드 */
-    .early-card {
-      background: linear-gradient(135deg, #F0FDF6 0%, #E8F9F0 100%);
-      border: 1px solid #B8EDD0; border-radius: var(--radius);
-      box-shadow: var(--shadow-sm); overflow: hidden;
-    }
-    .early-card .card-header { background: transparent; border-bottom-color: #C8F0DA; }
-    .early-card .card-title { color: var(--green-dark); }
-    .early-card .card-sub { color: #52A875; }
 
-    .early-item {
-      display: flex; align-items: center; padding: 12px 20px; gap: 12px;
-      border-top: 1px solid #D0F0E0; transition: background .1s;
-    }
     .early-item:first-child { border-top: none; }
     .early-item:hover { background: rgba(45,180,0,0.06); }
-    .early-rank { font-size: 13px; font-weight: 800; color: var(--green); width: 18px; text-align: center; flex-shrink: 0; }
-    .early-info { flex: 1; min-width: 0; }
-    .early-kw { font-size: 14px; font-weight: 700; color: var(--black); letter-spacing: -0.2px; }
-    .early-meta { font-size: 11px; color: #52A875; margin-top: 2px; }
-    .early-score {
-      font-size: 12px; font-weight: 700; color: var(--green-dark);
-      background: rgba(45,180,0,0.12); padding: 3px 8px; border-radius: 12px;
-      white-space: nowrap; flex-shrink: 0;
-    }
-    .early-empty { padding: 20px; text-align: center; }
-    .early-empty-icon { font-size: 24px; margin-bottom: 6px; }
-    .early-empty-text { font-size: 12px; color: #52A875; }
 
     /* TOP5 */
-    .top5-item {
-      display: flex; align-items: center; padding: 12px 20px; gap: 12px;
-      border-top: 1px solid var(--gray-6); transition: background .1s;
-    }
     .top5-item:first-child { border-top: none; }
     .top5-item:hover { background: var(--gray-6); }
-    .top5-rank { font-size: 14px; font-weight: 800; color: var(--gray-4); width: 18px; text-align: center; flex-shrink: 0; }
-    .top5-rank.r1 { color: var(--black); font-size: 16px; }
-    .top5-rank.r2 { color: var(--gray-2); }
-    .top5-rank.r3 { color: var(--gray-3); }
-    .top5-info { flex: 1; min-width: 0; }
-    .top5-kw { font-size: 14px; font-weight: 700; color: var(--black); letter-spacing: -0.2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .top5-meta { font-size: 11px; color: var(--gray-3); margin-top: 2px; }
-    .top5-rate { font-size: 13px; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-    .top5-rate.neg { color: var(--gray-4); }
 
     /* Rising */
-    .rising-item {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 20px; border-top: 1px solid var(--gray-6); transition: background .1s;
-    }
-    .rising-item:first-child { border-top: none; }
-    .rising-item:hover { background: var(--gray-6); }
-    .rising-left { display: flex; align-items: center; gap: 10px; }
-    .rising-num { font-size: 11px; font-weight: 700; color: var(--gray-4); width: 14px; }
-    .rising-kw { font-size: 13px; font-weight: 600; color: var(--black); }
-    .rising-rate { font-size: 12px; font-weight: 700; color: var(--green); font-variant-numeric: tabular-nums; }
 
     /* Stats */
-    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; }
-    .stat-cell { padding: 14px 18px; border-top: 1px solid var(--gray-6); border-right: 1px solid var(--gray-6); }
     .stat-cell:nth-child(even) { border-right: none; }
     .stat-cell:nth-child(-n+2) { border-top: none; }
-    .stat-label { font-size: 10px; color: var(--gray-3); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; margin-bottom: 5px; }
-    .stat-val { font-size: 19px; font-weight: 800; color: var(--black); letter-spacing: -0.5px; font-variant-numeric: tabular-nums; }
-    .stat-val.green { color: var(--green); }
-    .stat-val.sm { font-size: 14px; }
-    .stat-sub { font-size: 10px; color: var(--gray-3); margin-top: 2px; }
 
     /* ── FOOTER ── */
     /* ── 게시글 모달 ── */
@@ -562,8 +507,7 @@
     /* ── RESPONSIVE ── */
     @media (max-width: 900px) {
       .main-wrap { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
-      .rank-header-row, .rank-row { grid-template-columns: 40px 1fr 80px 72px; }
+        .rank-header-row, .rank-row { grid-template-columns: 40px 1fr 70px 70px 60px; }
       .rank-blog-col { display: none; }
       .rank-row.detail-view { grid-template-columns: 40px 1fr 80px; }
     }
@@ -574,7 +518,7 @@
       .card { border-radius: 10px; }
       .card-header { padding: 14px 14px 10px; }
       .card-title { font-size: 14px; }
-      .rank-header-row, .rank-row { grid-template-columns: 36px 1fr 70px 60px; padding: 9px 14px; }
+      .rank-header-row, .rank-row { grid-template-columns: 36px 1fr 60px 60px 50px; padding: 9px 14px; }
       .rank-num { width: 24px; height: 24px; font-size: 11px; }
       .kw-name { font-size: 13px; }
       .kw-comment { font-size: 11px; }
@@ -583,9 +527,7 @@
       .detail-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
       .detail-stat-val { font-size: 15px; }
       .posts-btn { margin: 0 14px 12px; width: calc(100% - 28px); }
-      .top5-item { padding: 10px 14px; }
-      .top5-kw { font-size: 13px; }
-      .history-row { padding: 8px 14px; gap: 6px; }
+          .history-row { padding: 8px 14px; gap: 6px; }
       .history-tab { padding: 4px 10px; font-size: 11px; }
       .modal-overlay { padding: 0; align-items: flex-end; }
       .modal-box { border-radius: 14px 14px 0 0; max-width: 100%; max-height: 90vh; }
@@ -628,35 +570,7 @@
     </div>
   </div>
 
-  <div class="sidebar" id="sidebar" style="display:none;">
-    <!-- Early Trend -->
-    <div class="early-card" id="earlyCard">
-      <div class="card-header">
-        <div>
-          <div class="card-title">🚀 조기 감지</div>
-          <div class="card-sub">검색 폭발 전 시그널</div>
-        </div>
-      </div>
-      <div id="earlyList"></div>
-    </div>
 
-    <!-- TOP5 -->
-    <div class="card">
-      <div class="card-header"><div><div class="card-title">TOP 5</div><div class="card-sub">실시간 인기 키워드</div></div></div>
-      <div id="top5List"></div>
-    </div>
-
-    <!-- Stats -->
-    <div class="card">
-      <div class="card-header"><div class="card-title">현황</div></div>
-      <div class="stats-grid">
-        <div class="stat-cell"><div class="stat-label">분석 키워드</div><div class="stat-val" id="stat-count">—</div><div class="stat-sub">개</div></div>
-        <div class="stat-cell"><div class="stat-label">최고 상승률</div><div class="stat-val green" id="stat-rate">—</div><div class="stat-sub">%</div></div>
-        <div class="stat-cell"><div class="stat-label">1위 키워드</div><div class="stat-val sm" id="stat-top">—</div><div class="stat-sub">현재 1위</div></div>
-        <div class="stat-cell"><div class="stat-label">조기감지</div><div class="stat-val sm green" id="stat-early">—</div><div class="stat-sub">개</div></div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <!-- 키워드 상세 모달 -->
@@ -906,59 +820,11 @@ async function manualRefresh() {
 function renderAll(data) {
   globalData = data;
   globalKws = data.keywords || [];
-  const earlyTrends = data.earlyTrends || [];
   const rising = data.rising || [];
-  const maxRate = Math.max(...globalKws.map(k => k.changeRate), 0);
 
   // Header
   const rankTime = data.rankUpdatedAt || data.updatedAt;
   document.getElementById('rankTime').textContent = fmt(rankTime) + ' 업데이트';
-
-  // Sidebar stats
-  document.getElementById('stat-count').textContent = globalKws.length || '—';
-  document.getElementById('stat-rate').textContent = maxRate || '—';
-  document.getElementById('stat-top').textContent = globalKws[0]?.keyword || '—';
-  document.getElementById('stat-early').textContent = earlyTrends.length || '0';
-
-  // Early Trend 사이드바
-  document.getElementById('earlyList').innerHTML = earlyTrends.length === 0
-    ? `<div class="early-empty">
-        <div class="early-empty-icon">🔍</div>
-        <div class="early-empty-text">현재 감지된 조기 트렌드가 없어요</div>
-      </div>`
-    : earlyTrends.map((kw, i) => `
-        <div class="early-item">
-          <div class="early-rank">${i+1}</div>
-          <div class="early-info">
-            <div class="early-kw">${kw.keyword}</div>
-            <div class="early-meta">3일 +${kw.risingRate}% · 블로그 ${kw.blogGrowth > 0 ? '+' : ''}${kw.blogGrowth}%</div>
-          </div>
-          <div class="early-score">폭발예감</div>
-        </div>`).join('');
-
-  // Early Trend 배너 (새로운 것만)
-  earlyTrends.forEach(kw => {
-    if (!shownEarlyTrends.has(kw.keyword)) {
-      shownEarlyTrends.add(kw.keyword);
-      // 첫 로드는 배너 안 띄움
-    }
-  });
-
-  // TOP5
-  document.getElementById('top5List').innerHTML = globalKws.slice(0,5).map((kw,i) => `
-    <div class="top5-item">
-      <div class="top5-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${kw.rank}</div>
-      <div class="top5-info">
-        <div class="top5-kw">${kw.keyword}</div>
-        <div class="top5-meta">${kw.comment || '트렌딩 키워드'}</div>
-      </div>
-      <div class="top5-rate ${kw.changeRate<=0?'neg':''}">${kw.changeRate>0?'+':''}${kw.changeRate}%</div>
-    </div>`).join('');
-
-  // Rising
-
-
-  document.getElementById('sidebar').style.display = 'flex';
 
   buildMainContent();
 }
@@ -973,8 +839,8 @@ function buildMainContent() {
     <div class="card">
       <div class="card-header">
         <div>
-          <div class="card-title">TOP 5 트렌드 차트</div>
-          <div class="card-sub">키워드를 눌러 최고점 시점을 확인하세요</div>
+          <div class="card-title">TOP 5 BTR Score</div>
+          <div class="card-sub">BTR 자체 점수 기준 추이 (데이터 누적 시 시계열 표시)</div>
         </div>
         <div class="tab-group" id="periodTabs">
           <button class="tab-btn active" data-days="7">1주</button>
@@ -1012,6 +878,7 @@ function buildMainContent() {
       </div>` : ''}
       <div class="rank-header-row">
         <span>순위</span><span>키워드</span>
+        <span style="text-align:right">BTR Score</span>
         <span style="text-align:right">검색변화</span>
         <span style="text-align:right">추세</span>
       </div>
@@ -1065,6 +932,7 @@ function buildRankRows(kws) {
             </div>
           </div>
           ${rateHtml(kw.changeRate)}
+          <div class="score-col" style="text-align:right;font-size:13px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;">${kw.score || '—'}</div>
           <div class="sparkline-col">${sparkline(kw.values, 72, 28, isChecked)}</div>
         </div>
         <div class="detail-panel" id="panel-${i}"></div>
@@ -1134,7 +1002,13 @@ function openKwDetail(keyword) {
     const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
     if (!ctx || !kw.values) return;
     const days = 28;
-    const values = kw.values.length >= days ? kw.values.slice(-days) : [...Array(days - kw.values.length).fill(0), ...kw.values];
+    // scoreValues 사용 (BTR Score 시계열)
+    const scoreArr = kw.scoreValues && kw.scoreValues.length > 1
+      ? kw.scoreValues
+      : [kw.score || 0];
+    const values = scoreArr.length >= days
+      ? scoreArr.slice(-days)
+      : [...Array(days - scoreArr.length).fill(null), ...scoreArr];
     const labels = Array.from({length: days}, (_, i) => {
       const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
       return (d.getMonth()+1) + '/' + d.getDate();
@@ -1173,6 +1047,7 @@ function openKwDetail(keyword) {
           pointHoverRadius: 4,
           tension: 0.4,
           fill: true,
+          spanGaps: false,
         }]
       },
       options: {
@@ -1187,7 +1062,7 @@ function openKwDetail(keyword) {
         }},
         scales: {
           x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { color: '#E8E8E8' } },
-          y: { min: 0, max: 110, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, stepSize: 25, callback: v => v <= 100 ? v : '' }, border: { color: '#E8E8E8' } }
+          y: { min: 0, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, callback: v => v }, border: { color: '#E8E8E8' } }
         }
       }
     });
@@ -1318,12 +1193,10 @@ function drawChart(days) {
   });
 
   const datasets = sourceKws.map((kw, i) => {
-    const raw = (kw.values||[]).length >= days
-      ? kw.values.slice(-days)
-      : [...Array(days - (kw.values||[]).length).fill(0), ...(kw.values||[])];
-    const maxV = Math.max(...raw, 1);
-    const minV = Math.min(...raw);
-    const range = maxV - minV || 1;
+    // scoreValues 사용 (BTR Score 시계열), 없으면 현재 score 단일값
+    const scoreRaw = kw.scoreValues && kw.scoreValues.length > 1
+      ? kw.scoreValues.slice(-days)
+      : Array(days).fill(null).map((_, j) => j === days - 1 ? (kw.score || 0) : null);
 
     const isSelected = selectedTop5Kw
       ? kw.keyword === selectedTop5Kw
@@ -1334,15 +1207,16 @@ function drawChart(days) {
 
     return {
       label: kw.keyword,
-      data: raw.map(v => Math.round(((v - minV) / range) * 100)),
+      data: scoreRaw,
       borderColor: lineColor,
       backgroundColor: fillColor,
       borderWidth: lineWidth,
-      pointRadius: isSelected ? 2 : 0,
-      pointHoverRadius: 4,
+      pointRadius: isSelected ? 3 : 1,
+      pointHoverRadius: 5,
       borderDash: isSelected ? [] : [4, 3],
       tension: 0.4,
       fill: isSelected,
+      spanGaps: false,
       order: isSelected ? 0 : 1,
     };
   });
@@ -1367,9 +1241,9 @@ function drawChart(days) {
       },
       scales: {
         x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' } }, border: { color: '#E8E8E8' } },
-        y: { min: 0, max: 110,
+        y: { min: 0,
           grid: { color: '#F4F4F4' },
-          ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' }, stepSize: 25, callback: v => v <= 100 ? v : '' },
+          ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' }, callback: v => v },
           border: { color: '#E8E8E8' }
         }
       }
