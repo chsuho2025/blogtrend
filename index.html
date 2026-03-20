@@ -1160,20 +1160,38 @@ function openKwDetail(keyword) {
         postsContainer.innerHTML = '<div style="padding:12px 0;font-size:13px;color:var(--gray-4);">불러오기 실패</div>';
       });
 
+    // 1위 그림자
+    const top1 = globalKws[0];
+    const shadowDataset = (top1 && top1.keyword !== keyword && top1.values?.length) ? {
+      data: (() => {
+        const v1 = top1.values.length >= days ? top1.values.slice(-days) : [...Array(days - top1.values.length).fill(0), ...top1.values];
+        const maxV1 = Math.max(...v1, 1); const minV1 = Math.min(...v1); const r1 = maxV1 - minV1 || 1;
+        return v1.map(v => Math.round(((v - minV1) / r1) * 100));
+      })(),
+      borderColor: 'rgba(0,0,0,0.08)',
+      backgroundColor: 'rgba(0,0,0,0.03)',
+      borderWidth: 1, pointRadius: 0, tension: 0.4, fill: true, order: 2,
+      label: '1위 기준',
+    } : null;
+
     kwDetailChartInstance = new Chart(ctx, {
       type: 'line',
       data: {
         labels,
-        datasets: [{
-          data: values,
-          borderColor: '#2DB400',
-          backgroundColor: 'rgba(45,180,0,0.08)',
-          borderWidth: 2,
-          pointRadius: 0,
-          pointHoverRadius: 4,
-          tension: 0.4,
-          fill: true,
-        }]
+        datasets: [
+          ...(shadowDataset ? [shadowDataset] : []),
+          {
+            data: values,
+            borderColor: '#2DB400',
+            backgroundColor: 'rgba(45,180,0,0.08)',
+            borderWidth: 2,
+            pointRadius: 0,
+            pointHoverRadius: 4,
+            tension: 0.4,
+            fill: true,
+            order: 0,
+          }
+        ]
       },
       options: {
         responsive: true, maintainAspectRatio: false,
@@ -1185,7 +1203,7 @@ function openKwDetail(keyword) {
         }},
         scales: {
           x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { color: '#E8E8E8' } },
-          y: { min: 0, max: 110, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, stepSize: 25, callback: v => v <= 100 ? v + '%' : '' }, border: { color: '#E8E8E8' } }
+          y: { min: 0, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 5, callback: v => v }, border: { color: '#E8E8E8' } }
         }
       }
     });
@@ -1323,8 +1341,6 @@ function drawChart(days) {
     const minV = Math.min(...raw);
     const range = maxV - minV || 1;
 
-    // 선택된 키워드는 초록, 나머지는 회색
-    // 아무것도 선택 안 했으면 1위만 초록
     const isSelected = selectedTop5Kw
       ? kw.keyword === selectedTop5Kw
       : i === 0;
@@ -1343,9 +1359,37 @@ function drawChart(days) {
       borderDash: isSelected ? [] : [4, 3],
       tension: 0.4,
       fill: isSelected,
-      order: isSelected ? 0 : 1, // 선택된 것이 앞에 그려짐
+      order: isSelected ? 0 : 1,
     };
   });
+
+  // 1위 그림자 dataset 추가 (1위가 선택된 경우엔 중복이므로 스킵)
+  const top1Kw = globalKws[0];
+  const isTop1Selected = selectedTop5Kw
+    ? selectedTop5Kw === top1Kw?.keyword
+    : true; // 선택 없을 때 기본이 1위라 이미 표시됨
+
+  if (top1Kw && !isTop1Selected && top1Kw.values?.length) {
+    const raw1 = top1Kw.values.length >= days
+      ? top1Kw.values.slice(-days)
+      : [...Array(days - top1Kw.values.length).fill(0), ...top1Kw.values];
+    const maxV1 = Math.max(...raw1, 1);
+    const minV1 = Math.min(...raw1);
+    const range1 = maxV1 - minV1 || 1;
+    datasets.push({
+      label: '1위 기준 (' + top1Kw.keyword + ')',
+      data: raw1.map(v => Math.round(((v - minV1) / range1) * 100)),
+      borderColor: 'rgba(0,0,0,0.08)',
+      backgroundColor: 'rgba(0,0,0,0.03)',
+      borderWidth: 1,
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      borderDash: [],
+      tension: 0.4,
+      fill: true,
+      order: 2, // 맨 뒤에 그려짐
+    });
+  }
 
   chartInstance = new Chart(ctx, {
     type: 'line',
@@ -1365,9 +1409,9 @@ function drawChart(days) {
       },
       scales: {
         x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' } }, border: { color: '#E8E8E8' } },
-        y: { min: 0, max: 110,
+        y: { min: 0,
           grid: { color: '#F4F4F4' },
-          ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' }, stepSize: 25, callback: v => v <= 100 ? v + '%' : '' },
+          ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' }, maxTicksLimit: 5, callback: v => v },
           border: { color: '#E8E8E8' }
         }
       }
