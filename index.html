@@ -933,7 +933,7 @@ function buildRankRows(kws) {
           </div>
           ${rateHtml(kw.changeRate)}
           <div class="score-col" style="text-align:right;font-size:13px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;">${kw.score || '—'}</div>
-          <div class="sparkline-col">${sparkline(kw.values, 72, 28, isChecked)}</div>
+          <div class="sparkline-col">${sparkline(kw.scoreValues && kw.scoreValues.length > 1 ? kw.scoreValues : kw.values, 72, 28, isChecked)}</div>
         </div>
         <div class="detail-panel" id="panel-${i}"></div>
       </div>`;
