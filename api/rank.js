@@ -274,6 +274,18 @@ module.exports = async (req, res) => {
 
     const rankUpdatedAt = new Date().toISOString();
 
+    // score_history 읽기
+    const scoreHistMap = {};
+    await Promise.all(finalRanked.map(async k => {
+      try {
+        const stored = await redis.get(`score_history:${k.keyword}`);
+        if (stored) {
+          const hist = typeof stored === 'string' ? JSON.parse(stored) : stored;
+          scoreHistMap[k.keyword] = hist.map(h => h.score);
+        }
+      } catch(e) {}
+    }));
+
     const result = {
       updatedAt: prevData.updatedAt,
       rankUpdatedAt,
@@ -297,6 +309,7 @@ module.exports = async (req, res) => {
         earlyScore: k.earlyScore,
         comment: prevKeywords.find(p => p.keyword === k.keyword)?.comment || '',
         values: k.values.slice(-28),
+        scoreValues: scoreHistMap[k.keyword] || [Math.round(k.emaScore * 100)],
       })),
       rising: risingRanked.map((k, i) => ({
         rank: i + 1,

@@ -834,17 +834,36 @@ module.exports = async (req, res) => {
           keyword: k.keyword,
           changeRate: Math.round(k.changeRate),
           risingRate: Math.round(k.risingRate),
+          score: Math.round(k.score * 100),
           rank: k.rank,
           blogSurge: k.blogSurge || false,
         })),
       });
-      history = history.filter(h => h.date); // date 없는 구형 항목 제거
+      history = history.filter(h => h.date);
       history.sort((a, b) => b.date.localeCompare(a.date));
-      history = history.slice(0, 30); // 5일 → 30일
+      history = history.slice(0, 30);
       await redis.set('trend_history', JSON.stringify(history));
       console.log('[trend_history] 저장:', dateStrKST, '/ 누적:', history.length + '일치');
     } catch(e) {
       console.log('[trend_history] 저장 실패:', e.message);
+    }
+
+    // BTR Score 히스토리 저장 - 키워드별 score 시계열
+    try {
+      await Promise.all(finalRanked.slice(0, 20).map(async k => {
+        const scoreKey = `score_history:${k.keyword}`;
+        let scoreHist = [];
+        const stored = await redis.get(scoreKey);
+        if (stored) scoreHist = typeof stored === 'string' ? JSON.parse(stored) : stored;
+        scoreHist = scoreHist.filter(h => h.date !== dateStrKST);
+        scoreHist.push({ date: dateStrKST, score: Math.round(k.score * 100) });
+        scoreHist.sort((a, b) => a.date.localeCompare(b.date));
+        scoreHist = scoreHist.slice(-30); // 최대 30일치
+        await redis.set(scoreKey, JSON.stringify(scoreHist));
+      }));
+      console.log('[score_history] 저장 완료:', finalRanked.slice(0, 3).map(k => `${k.keyword}(${Math.round(k.score*100)})`));
+    } catch(e) {
+      console.log('[score_history] 저장 실패:', e.message);
     }
     res.status(200).json({
       success: true,

@@ -38,6 +38,7 @@ module.exports = async (req, res) => {
         earlyScore: k.earlyScore || 0,
         comment: k.comment || '',
         values: k.values || [],
+        scoreValues: k.scoreValues || [k.score || 0],
       })),
       rising: data.rising || [],
       earlyTrends: data.earlyTrends || [],
