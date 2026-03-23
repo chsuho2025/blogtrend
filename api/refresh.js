@@ -894,9 +894,17 @@ module.exports = async (req, res) => {
       const blogSurgeRate = surge?.blogSurgeRate || 0;
       const blogSurgeBonus = blogSurgeRate >= 20 ? 0.15 : blogSurgeRate >= 10 ? 0.08 : 0;
 
-      const risingScore = t.risingRate > 0 ? (t.risingRate / maxRising) * 0.3 : 0;
-      const score = (t.weeklyRate / maxRate) * 0.50
+      // 포스팅 수 규모 점수 — log 스케일 정규화 (상한 50만)
+      // 100건 ≈ 0.37, 5만건 ≈ 0.86, 50만건 = 1.0
+      const postVolumeScore = postCount && postCount > 0
+        ? Math.min(Math.log10(postCount) / Math.log10(500000), 1)
+        : 0;
+
+      // BTR Score: 변화율 중심 유지 (73%) + 포스팅 규모 보조 (12%)
+      const risingScore = t.risingRate > 0 ? (t.risingRate / maxRising) * 0.28 : 0;
+      const score = (t.weeklyRate / maxRate) * 0.45
         + risingScore
+        + postVolumeScore * 0.12
         + blogSurgeBonus
         + newBonus;
 

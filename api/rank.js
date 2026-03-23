@@ -207,8 +207,17 @@ module.exports = async (req, res) => {
       const normRising = Math.min(Math.max(t.risingRate, 0) / maxRising, 1);
       const normBlog = Math.min(Math.max(t.blogGrowth, 0) / maxBlog, 1);
 
-      // 점수: weeklyRate 50% + risingRate 30% + blogGrowth 10% + newBonus (refresh.js와 통일)
-      const rawScore = normWeekly * 0.50 + normRising * 0.30 + normBlog * 0.10 + newBonus;
+      // 포스팅 수 규모 점수 — log 스케일 정규화 (refresh.js와 동일)
+      const postVolumeScore = t.postCount && t.postCount > 0
+        ? Math.min(Math.log10(t.postCount) / Math.log10(500000), 1)
+        : 0;
+
+      // BTR Score: 변화율 중심 유지 (73%) + 포스팅 규모 보조 (12%) + blogGrowth 보조
+      const rawScore = normWeekly * 0.45
+        + normRising * 0.28
+        + postVolumeScore * 0.12
+        + normBlog * 0.10
+        + newBonus;
 
       // EMA 스무딩 적용 (메인 랭킹용)
       const emaScore = await applyEMA(t.keyword, rawScore);
