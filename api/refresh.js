@@ -992,9 +992,10 @@ module.exports = async (req, res) => {
           blogSurgeRate = ((postCount - yesterdayCount) / yesterdayCount) * 100;
         }
 
-        // 오늘 기록 추가
+        // 오늘 기록 추가 — count(누적), daily(전날 대비 신규) 함께 저장
+        const daily = yesterdayCount > 0 ? Math.max(0, postCount - yesterdayCount) : null;
         hist = hist.filter(h => h.date !== today);
-        hist.push({ date: today, count: postCount });
+        hist.push({ date: today, count: postCount, daily });
         await redis.set(histKey, JSON.stringify(hist));
 
         if (blogSurgeRate >= 20) {
@@ -1072,6 +1073,7 @@ module.exports = async (req, res) => {
     console.log('[신규 키워드]', finalRanked.filter(k => k.isNew).map(k => k.keyword));
 
     // post_history 읽기 — polishKeywords 전에 원본 keyword로 조회 (중요: polish 후 keyword 불일치 방지)
+    // daily(전날 대비 신규 포스팅 수) 기반으로 그래프 구성 — null이면 데이터 없는 날
     const originalKeywords = finalRanked.map(k => k.keyword);
     const postHistoryCache = {};
     await Promise.all(originalKeywords.map(async (origKw, i) => {
@@ -1080,7 +1082,13 @@ module.exports = async (req, res) => {
         if (raw) {
           const hist = typeof raw === 'string' ? JSON.parse(raw) : raw;
           hist.sort((a, b) => a.date.localeCompare(b.date));
-          postHistoryCache[i] = hist.map(h => h.count); // index 기반 저장
+          // daily 값 사용 (전날 대비 신규 포스팅 수), 없으면 null
+          const dailyValues = hist.map(h => h.daily != null ? h.daily : null);
+          // 모두 null이면 오늘 count 1개만 fallback
+          const hasData = dailyValues.some(v => v != null);
+          postHistoryCache[i] = hasData
+            ? dailyValues
+            : (hist.length > 0 ? [hist[hist.length - 1].count] : []);
         }
       } catch(e) {}
     }));

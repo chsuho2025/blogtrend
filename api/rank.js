@@ -280,7 +280,12 @@ module.exports = async (req, res) => {
         if (postRaw) {
           const hist = typeof postRaw === 'string' ? JSON.parse(postRaw) : postRaw;
           hist.sort((a, b) => a.date.localeCompare(b.date));
-          postHistMap[k.keyword] = hist.map(h => h.count);
+          // daily(전날 대비 신규 포스팅 수) 기반, 없으면 count fallback
+          const dailyValues = hist.map(h => h.daily != null ? h.daily : null);
+          const hasData = dailyValues.some(v => v != null);
+          postHistMap[k.keyword] = hasData
+            ? dailyValues
+            : (hist.length > 0 ? [hist[hist.length - 1].count] : []);
         }
       } catch(e) {}
     }));
