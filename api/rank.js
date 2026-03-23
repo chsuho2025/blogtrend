@@ -184,6 +184,7 @@ module.exports = async (req, res) => {
       values: k.values || [],
       postCount: blogMap[k.keyword]?.postCount || k.postCount || 0,
       blogGrowth: blogMap[k.keyword]?.blogGrowth || 0,
+      hasEnoughData: blogMap[k.keyword]?.hasEnoughData || false,
       blogSurgeRate: k.blogSurgeRate || 0, // refresh에서 계산된 급등률
       blogSurge: k.blogSurge || false,
       category: k.category || '',

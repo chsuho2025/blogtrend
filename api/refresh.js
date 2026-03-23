@@ -840,7 +840,7 @@ module.exports = async (req, res) => {
         isNew: k.isNew,
         comment: comments[i] || '',
         values: k.values.slice(-28),
-        scoreValues: [k.score], // 이미 Math.round(원점수*100), score_history 누적 후 rank.js에서 확장
+        scoreValues: [Math.round(k.score * 100)], // score_history 누적 후 rank.js에서 확장
       })),
       rising: risingRanked.map((k, i) => ({
         rank: i + 1,
@@ -900,7 +900,7 @@ module.exports = async (req, res) => {
           keyword: k.keyword,
           changeRate: Math.round(k.changeRate),
           risingRate: Math.round(k.risingRate),
-          score: k.score,
+          score: Math.round(k.score * 100),
           rank: k.rank,
           blogSurge: k.blogSurge || false,
         })),
@@ -922,12 +922,12 @@ module.exports = async (req, res) => {
         const stored = await redis.get(scoreKey);
         if (stored) scoreHist = typeof stored === 'string' ? JSON.parse(stored) : stored;
         scoreHist = scoreHist.filter(h => h.date !== dateStrKST);
-        scoreHist.push({ date: dateStrKST, score: k.score }); // 이미 Math.round(원점수*100)
+        scoreHist.push({ date: dateStrKST, score: Math.round(k.score * 100) });
         scoreHist.sort((a, b) => a.date.localeCompare(b.date));
         scoreHist = scoreHist.slice(-30); // 최대 30일치
         await redis.set(scoreKey, JSON.stringify(scoreHist));
       }));
-      console.log('[score_history] 저장 완료:', finalRanked.slice(0, 3).map(k => `${k.keyword}(${k.score})`));
+      console.log('[score_history] 저장 완료:', finalRanked.slice(0, 3).map(k => `${k.keyword}(${Math.round(k.score * 100)})`));
     } catch(e) {
       console.log('[score_history] 저장 실패:', e.message);
     }
