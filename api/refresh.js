@@ -301,7 +301,11 @@ async function deduplicateByMeaning(newKeywords, existingKeywords) {
 - 같은 이벤트의 다른 표현 (BTS 광화문 콘서트 = 방탄소년단 광화문 공연 = BTS 컴백 콘서트)
 - 같은 제품/브랜드의 다른 표현 (삼성전자 배당금 = 삼성전자 특별배당금)
 - 기존 키워드와 같은 이슈를 다루는 신규 키워드
-- 중복 중 가장 구체적이고 검색량이 많을 것 같은 1개만 남길 것
+- 중복 그룹에서 가장 구체적이고 검색량이 많을 것 같은 1개만 남길 것
+
+★ 절대 규칙: 중복 그룹이 있어도 반드시 그 그룹에서 대표 키워드 1개는 살려야 해.
+예) "BTS 광화문 콘서트", "방탄소년단 광화문 공연", "BTS 컴백 콘서트" → 이 중 1개는 반드시 남김
+절대로 중복 그룹 전체를 다 제거하면 안 돼.
 
 반드시 JSON 배열로만: ["남길키워드1", "남길키워드2", ...]
 제거 없이 다 남기는 것도 가능. 다른 설명 없이 JSON만.`,
@@ -362,6 +366,9 @@ async function cleanPoolDuplicates(pool) {
 - "BTS 광화문 콘서트", "방탄소년단 광화문 공연", "BTS 컴백 콘서트" → "BTS 광화문 콘서트" 1개만
 - "삼성전자 배당금", "삼성전자 특별배당금" → "삼성전자 특별배당금" 1개만
 - "아카데미 시상식", "아카데미상" → "아카데미 시상식" 1개만
+
+★ 절대 규칙: 중복 그룹이 있어도 반드시 그 그룹에서 대표 키워드 1개는 살려야 해.
+절대로 중복 그룹 전체를 다 제거하면 안 돼.
 
 반드시 JSON 배열로만: ["키워드1", "키워드2", ...]
 다른 설명 없이 JSON만.`,
@@ -543,25 +550,35 @@ async function getSearchTrends(keywords) {
 // Step 5: 포스팅 수 조회
 // ─────────────────────────────────────────
 async function getBlogPostCount(keywords) {
-  return Promise.all(keywords.map(async (kw) => {
-    try {
-      const res = await fetch(
-        `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(kw)}&display=1`,
-        {
-          headers: {
-            'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
-            'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
-          },
-        }
-      );
-      const data = await res.json();
-      // total이 0이거나 없으면 null (API 실패로 간주, 프론트에서 "—" 표시)
-      const total = (data.total && data.total > 0) ? data.total : null;
-      return { keyword: kw, total };
-    } catch {
-      return { keyword: kw, total: null };
-    }
-  }));
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const results = [];
+
+  // 40개 동시 호출 → rate limit 위험. 5개씩 순차 처리로 변경
+  for (let i = 0; i < keywords.length; i += 5) {
+    const chunk = keywords.slice(i, i + 5);
+    const chunkResults = await Promise.all(chunk.map(async (kw) => {
+      try {
+        const res = await fetch(
+          `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(kw)}&display=1&sort=sim`,
+          {
+            headers: {
+              'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
+              'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
+            },
+          }
+        );
+        const data = await res.json();
+        // total이 0이거나 없으면 null
+        const total = (data.total && data.total > 0) ? data.total : null;
+        return { keyword: kw, total };
+      } catch {
+        return { keyword: kw, total: null };
+      }
+    }));
+    results.push(...chunkResults);
+    if (i + 5 < keywords.length) await sleep(120); // chunk 간 120ms 간격
+  }
+  return results;
 }
 
 // ─────────────────────────────────────────
@@ -782,6 +799,10 @@ module.exports = async (req, res) => {
     const poolKeywords = keywordPool.slice(0, 40).map(item => item.keyword);
     const poolPostCounts = await getBlogPostCount(poolKeywords);
     const poolPostMap = Object.fromEntries(poolPostCounts.map(p => [p.keyword, p.total]));
+    // DataLab이 키워드를 약간 변형해서 반환할 때를 위한 normKw 기반 fallback 맵
+    const poolPostNormMap = Object.fromEntries(
+      poolPostCounts.map(p => [normKw(p.keyword), p.total])
+    );
 
     // 50만 초과 제거 (null이면 통과)
     const filteredPool = poolKeywords.filter(kw => {
@@ -865,7 +886,7 @@ module.exports = async (req, res) => {
     const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
 
     const ranked = rawTrends.map(t => {
-      const postCount = poolPostMap[t.keyword] ?? null;
+      const postCount = poolPostMap[t.keyword] ?? poolPostNormMap[normKw(t.keyword)] ?? null;
       const addedDate = addedAtMap[t.keyword] || today;
       const daysInPool = daysDiff(addedDate);
       const newBonus = daysInPool <= 3 ? 0.15 : 0;
