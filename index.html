@@ -854,7 +854,7 @@ function buildRankRows(kws) {
           </div>
           ${rateHtml(kw.changeRate)}
           <div class="score-col" style="text-align:right;font-size:13px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;">${kw.score || '—'}</div>
-          <div class="sparkline-col">${sparkline(kw.postValues && kw.postValues.length > 0 ? kw.postValues : [], 72, 28, isChecked)}</div>
+          <div class="sparkline-col">${sparkline(kw.values && kw.values.length > 1 ? kw.values : [], 72, 28, isChecked)}</div>
         </div>
       </div>`;
   }
@@ -938,16 +938,31 @@ function openKwDetail(keyword) {
     if (kwDetailChartInstance) { kwDetailChartInstance.destroy(); kwDetailChartInstance = null; }
     const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
     if (!ctx) return;
-    // postValues: 날짜별 포스팅 수 절댓값 그래프
-    const postArr = kw.postValues && kw.postValues.length > 0 ? kw.postValues : [];
-    const days = Math.max(postArr.length, 7); // 최소 7일 축
-    const values = postArr.length >= days
-      ? postArr.slice(-days)
-      : [...Array(days - postArr.length).fill(null), ...postArr];
+    // 차트 부제목: 일별 신규 포스팅 수
+    const chartTitle = document.querySelector('.kw-detail-chart-wrap');
+    if (chartTitle && !chartTitle.querySelector('.chart-subtitle')) {
+      const sub = document.createElement('div');
+      sub.className = 'chart-subtitle';
+      sub.style.cssText = 'font-size:10px;color:var(--gray-4);text-align:right;margin-bottom:4px;';
+      sub.textContent = peakLabel ? `검색지수 (28일) · ${peakLabel}` : '검색지수 (28일)';
+      chartTitle.insertBefore(sub, chartTitle.firstChild);
+    }
+    // values(검색지수): 28일치 즉시 제공, 키워드별 피크 시점 파악에 최적
+    const rawValues = kw.values && kw.values.length > 0 ? kw.values : [];
+    const days = 28;
+    const values = rawValues.length >= days
+      ? rawValues.slice(-days)
+      : [...Array(days - rawValues.length).fill(null), ...rawValues];
     const labels = Array.from({length: days}, (_, i) => {
       const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
       return (d.getMonth()+1) + '/' + d.getDate();
     });
+    // 피크 날짜 계산
+    const peakIdx = values.reduce((best, v, i) => (v != null && (best === -1 || v > values[best])) ? i : best, -1);
+    const peakDaysAgo = peakIdx >= 0 ? days - 1 - peakIdx : -1;
+    const peakLabel = peakDaysAgo === 0 ? '오늘 최고점'
+      : peakDaysAgo === 1 ? '어제 최고점'
+      : peakDaysAgo > 1 ? `${peakDaysAgo}일 전 최고점` : '';
     // 게시글 비동기 로드
     fetch('/api/posts?keyword=' + encodeURIComponent(keyword) + '&display=20')
       .then(r => r.json())
@@ -1001,7 +1016,7 @@ function openKwDetail(keyword) {
         }},
         scales: {
           x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { color: '#E8E8E8' } },
-          y: { min: 0, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, callback: v => v >= 10000 ? (v/10000).toFixed(0)+'만' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v }, border: { color: '#E8E8E8' } }
+          y: { min: 0, max: 100, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, callback: v => v }, border: { color: '#E8E8E8' } }
         }
       }
     });
