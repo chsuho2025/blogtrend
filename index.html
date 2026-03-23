@@ -99,83 +99,11 @@
     .card-title { font-size: 15px; font-weight: 800; color: var(--black); letter-spacing: -0.4px; }
     .card-sub { font-size: 12px; color: var(--gray-3); margin-top: 2px; font-weight: 400; }
 
-    /* ── TABS ── */
-    .tab-group {
-      display: flex; background: var(--gray-6);
-      border-radius: 8px; padding: 2px; gap: 1px;
-    }
-    .tab-btn {
-      padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 500;
-      cursor: pointer; color: var(--gray-3); background: none; border: none;
-      font-family: 'Pretendard', sans-serif; transition: all .15s;
-    }
-    .tab-btn:hover { color: var(--black); }
-    .tab-btn-disabled {
-      opacity: 0.35 !important; cursor: not-allowed !important; pointer-events: auto !important;
-    }
-    .tab-btn-disabled:hover::after {
-      content: attr(title);
-      position: absolute; top: calc(100% + 6px); left: 50%; transform: translateX(-50%);
-      background: var(--black); color: var(--white); font-size: 11px; font-weight: 500;
-      padding: 4px 8px; border-radius: 6px; white-space: nowrap; z-index: 100;
-    }
-    .tab-btn { position: relative; }
-    .tab-btn.active {
-      background: var(--white); color: var(--black); font-weight: 700;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
-    }
+
 
     /* ── CATEGORY TABS ── */
-    .cat-tabs {
-      display: flex; gap: 4px; padding: 12px 20px 0; flex-wrap: nowrap; overflow-x: auto;
-      scrollbar-width: none;
-    }
-    .cat-tabs::-webkit-scrollbar { display: none; }
-    .cat-tab {
-      padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
-      cursor: pointer; color: var(--gray-3); background: var(--gray-6);
-      border: 1.5px solid transparent; white-space: nowrap;
-      font-family: 'Pretendard', sans-serif; transition: all .15s; flex-shrink: 0;
-    }
-    .cat-tab:hover { color: var(--black); }
-    .cat-tab.active { background: var(--green-dim); color: var(--green-dark); border-color: var(--green); font-weight: 700; }
-    .cat-tab:disabled { opacity: .4; cursor: not-allowed; }
 
-    /* ── CHART ── */
-    .chart-section { padding: 16px 20px 8px; }
-    .chart-wrap { height: 260px; position: relative; margin-bottom: 10px; }
-    .chart-legend {
-      display: flex; flex-wrap: wrap; gap: 6px; padding: 0 0 12px;
-    }
-    .legend-item {
-      display: flex; align-items: center; gap: 5px;
-      padding: 4px 10px; border-radius: 20px;
-      border: 1.5px solid var(--gray-5); cursor: pointer;
-      font-size: 12px; font-weight: 500; color: var(--gray-3);
-      transition: all .15s; user-select: none; background: var(--white);
-    }
-    .legend-item.active { border-color: var(--green); color: var(--black); background: var(--green-dim); }
-    .legend-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--gray-5); flex-shrink: 0; }
-    .legend-item.active .legend-dot { background: var(--green); }
 
-    /* 히스토리 탭 */
-    .history-row {
-      display: flex; align-items: center; gap: 4px;
-      padding: 8px 20px 12px; border-top: 1px solid var(--gray-6);
-      overflow-x: auto; scrollbar-width: none;
-    }
-    .history-row::-webkit-scrollbar { display: none; }
-    .history-tab {
-      padding: 3px 9px; border-radius: 5px; font-size: 11px; font-weight: 500;
-      cursor: pointer; color: var(--gray-3); background: var(--gray-6);
-      border: none; white-space: nowrap;
-      font-family: 'Pretendard', sans-serif; transition: all .15s; flex-shrink: 0;
-    }
-    .history-tab.active { background: var(--black); color: var(--white); font-weight: 700; }
-    .history-more {
-      font-size: 11px; color: var(--green); font-weight: 600;
-      cursor: pointer; white-space: nowrap; flex-shrink: 0; padding: 3px 4px;
-    }
 
 
     /* ── RANK TABLE ── */
@@ -255,39 +183,7 @@
     .sparkline-col { display: flex; justify-content: flex-end; align-items: center; }
     .sparkline-col svg { display: block; }
 
-    /* ── 상세 패널 ── */
-    .detail-panel {
-      display: none; flex-direction: column;
-      background: #FAFAFA; border-top: 1px solid var(--gray-6);
-    }
-    .detail-panel.open { display: flex; }
 
-    .detail-chart-wrap {
-      padding: 16px 20px 8px 20px; height: 160px;
-    }
-    .detail-stats {
-      display: grid; grid-template-columns: 1fr 1fr 1fr;
-      padding: 0 20px 14px; gap: 12px;
-    }
-    .detail-stat { display: flex; flex-direction: column; gap: 2px; }
-    .detail-stat-label { font-size: 10px; color: var(--gray-4); font-weight: 600; text-transform: uppercase; letter-spacing: 0.3px; }
-    .detail-stat-val { font-size: 16px; font-weight: 800; color: var(--black); font-variant-numeric: tabular-nums; letter-spacing: -0.4px; }
-    .detail-stat-val.up { color: var(--green); }
-    .detail-stat-val.gray { color: var(--gray-3); }
-
-    .post-item {
-      display: flex; flex-direction: column; gap: 2px;
-      padding: 11px 20px 11px 52px; border-top: 1px solid var(--gray-6);
-      text-decoration: none; transition: background .1s;
-    }
-    .post-item:hover { background: #F0FDF6; }
-    .post-title {
-      font-size: 13px; font-weight: 600; color: var(--black);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-    }
-    .post-desc { font-size: 11px; color: var(--gray-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .post-meta { font-size: 11px; color: var(--gray-4); margin-top: 1px; }
-    .panel-msg { padding: 14px 20px 14px 52px; font-size: 12px; color: var(--gray-3); }
 
     /* ── 하단 empty ── */
     .empty-end {
@@ -496,6 +392,64 @@
     }
     .rank-more-btn:hover { background: var(--gray-5); color: var(--black); }
 
+    /* ── 급상승 TOP3 ── */
+    .rising3-wrap {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      padding: 4px 20px 20px;
+    }
+    @media (max-width: 680px) {
+      .rising3-wrap { grid-template-columns: 1fr; gap: 8px; padding: 4px 14px 16px; }
+    }
+    .rising3-item {
+      position: relative; border-radius: 14px; padding: 18px 16px 16px;
+      cursor: pointer; transition: all .18s cubic-bezier(.4,0,.2,1);
+      display: flex; flex-direction: column; gap: 10px;
+      overflow: hidden; border: 1.5px solid transparent;
+    }
+    .rising3-item::before {
+      content: ''; position: absolute; inset: 0;
+      background: var(--rising3-bg, #f7f7f7);
+      z-index: 0; transition: opacity .18s;
+    }
+    .rising3-item::after {
+      content: var(--rising3-num, '1');
+      position: absolute; right: -8px; bottom: -16px;
+      font-size: 72px; font-weight: 900; line-height: 1;
+      color: var(--rising3-accent, #E53935);
+      opacity: 0.06; z-index: 0; letter-spacing: -2px;
+    }
+    .rising3-item > * { position: relative; z-index: 1; }
+    .rising3-item:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.10); border-color: var(--rising3-accent, #E53935); }
+    .rising3-item.i1 { --rising3-bg: #FFF5F5; --rising3-accent: #E53935; --rising3-num: '1'; }
+    .rising3-item.i2 { --rising3-bg: #FFF8F5; --rising3-accent: #FF5722; --rising3-num: '2'; }
+    .rising3-item.i3 { --rising3-bg: #FFFBF0; --rising3-accent: #FF8F00; --rising3-num: '3'; }
+    .rising3-rank-row { display: flex; align-items: center; justify-content: space-between; }
+    .rising3-rank {
+      font-size: 9px; font-weight: 900; letter-spacing: 1.2px;
+      text-transform: uppercase; color: var(--rising3-accent);
+    }
+    .rising3-badge {
+      font-size: 9px; font-weight: 700; padding: 2px 6px;
+      border-radius: 5px; flex-shrink: 0;
+    }
+    .rising3-badge-surge { background: #E3F2FD; color: #1565C0; }
+    .rising3-badge-early { background: var(--green-dim); color: var(--green-dark); }
+    .rising3-badge-new { background: #FFF8E1; color: #E65100; }
+    .rising3-kw {
+      font-size: 15px; font-weight: 800; color: var(--black);
+      letter-spacing: -0.4px; line-height: 1.25;
+    }
+    .rising3-bottom { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; }
+    .rising3-rate {
+      font-size: 26px; font-weight: 900; color: var(--rising3-accent);
+      font-variant-numeric: tabular-nums; letter-spacing: -1px; line-height: 1;
+    }
+    .rising3-comment {
+      font-size: 10.5px; color: var(--gray-3); line-height: 1.45; text-align: right;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+      overflow: hidden; max-width: 55%;
+    }
+
     footer { max-width: 1160px; margin: 0 auto; padding: 16px 24px 36px; display: flex; align-items: center; justify-content: space-between; }
     .footer-left { font-size: 11px; color: var(--gray-4); }
     .footer-tags { display: flex; gap: 5px; }
@@ -520,18 +474,15 @@
       .kw-name { font-size: 13px; }
       .kw-comment { font-size: 11px; }
       .sparkline-col svg { width: 60px; }
-      .detail-panel { padding: 12px 14px; }
       .detail-stats { grid-template-columns: repeat(3, 1fr); gap: 8px; }
       .detail-stat-val { font-size: 15px; }
       .posts-btn { margin: 0 14px 12px; width: calc(100% - 28px); }
-          .history-row { padding: 8px 14px; gap: 6px; }
       .history-tab { padding: 4px 10px; font-size: 11px; }
       .modal-overlay { padding: 0; align-items: flex-end; }
       .modal-box { border-radius: 14px 14px 0 0; max-width: 100%; max-height: 90vh; }
       .modal-header { padding: 16px 16px 12px; }
       .modal-post-item { padding: 12px 16px; }
       .chart-wrap { height: 160px; }
-      .right-col { display: none; }
       .footer-left, .footer-right { font-size: 10px; }
       footer { padding: 12px 14px 24px; flex-direction: column; gap: 4px; }
     }
@@ -636,14 +587,11 @@
 
 <script>
 // ── 전역 상태 ──
-let chartInstance = null;
 let globalKws = [];
 let globalHistory = [];
 let globalData = null;
 
 let activeHistoryIdx = -1;
-let activeCat = 'all';
-let selectedTop5Kw = null;
 
 // ── 스파크라인 SVG ──
 function sparkline(values, width=72, height=28, isChecked=false) {
@@ -763,8 +711,7 @@ async function loadHistory() {
     if (!res.ok) return;
     const data = await res.json();
     globalHistory = data.history || [];
-    rebuildHistoryTabs();
-  } catch(e) {}
+    } catch(e) {}
 }
 
 async function manualRefresh() {
@@ -791,30 +738,17 @@ function renderAll(data) {
 // ── 메인 콘텐츠 빌드 ──
 function buildMainContent() {
   const kws = globalKws;
-  const hasCategory = kws.some(k => k.category);
-
   document.getElementById('leftCol').innerHTML = `
-    <!-- TOP5 차트 카드 -->
-    <div class="card">
+    <!-- 급상승 TOP3 카드 -->
+    <div class="card" id="rising3Card">
       <div class="card-header">
         <div>
-          <div class="card-title">TOP 5 트렌드 지수</div>
-          <div class="card-sub">BTR 자체 점수 기준 추이 (데이터 누적 시 시계열 표시)</div>
+          <div class="card-title">🔥 급상승 TOP 3</div>
+          <div class="card-sub">최근 3일 검색량 급등 키워드</div>
         </div>
-        <div class="tab-group" id="periodTabs">
-          <button class="tab-btn active" data-days="7">1주</button>
-          <button class="tab-btn tab-btn-disabled" data-days="14" title="서비스 준비 중입니다" onclick="return false;">2주</button>
-          <button class="tab-btn tab-btn-disabled" data-days="28" title="서비스 준비 중입니다" onclick="return false;">4주</button>
-        </div>
+        <div id="rising3UpdateTime" style="font-size:11px;color:var(--gray-4);align-self:center;"></div>
       </div>
-      <div class="chart-section">
-        <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
-        <div class="chart-legend" id="chartLegend"></div>
-      </div>
-      <div class="history-row" id="historyRow">
-        <button class="history-tab active" data-idx="-1">현재</button>
-        <span class="history-more" id="historyMore" style="display:none" onclick="loadHistory()">더 보기</span>
-      </div>
+      <div id="rising3List"></div>
     </div>
 
     <!-- 실시간 랭킹 카드 -->
@@ -824,17 +758,9 @@ function buildMainContent() {
           <div class="card-title">실시간 랭킹</div>
           <div class="card-sub">네이버 블로그 트렌드 TOP 20</div>
         </div>
-
+        <button onclick="openHistModal()" style="height:28px;padding:0 10px;background:var(--gray-6);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;color:var(--gray-3);cursor:pointer;font-family:Pretendard,sans-serif;">📅 이력</button>
       </div>
-      ${hasCategory ? `
-      <div class="cat-tabs" id="catTabs">
-        <button class="cat-tab active" data-cat="all">전체</button>
-        <button class="cat-tab" data-cat="FOOD">음식</button>
-        <button class="cat-tab" data-cat="BEAUTY">뷰티</button>
-        <button class="cat-tab" data-cat="FASHION">패션</button>
-        <button class="cat-tab" data-cat="TECH">테크</button>
-        <button class="cat-tab" data-cat="LIFE">라이프</button>
-      </div>` : ''}
+
       <div class="rank-header-row">
         <span>순위</span><span>키워드</span>
         <span style="text-align:right">검색변화</span>
@@ -846,25 +772,62 @@ function buildMainContent() {
 
   `;
 
-  // 초기 1위 선택
-  if (!selectedTop5Kw && kws.length > 0) {
-    selectedTop5Kw = kws[0].keyword;
+  buildRising3(kws);
+}
+
+// ── 급상승 TOP3 빌드 ──
+function buildRising3(kws) {
+  const container = document.getElementById('rising3List');
+  if (!container) return;
+
+  const top3 = [...kws]
+    .filter(k => k.risingRate > 0)
+    .sort((a, b) => b.risingRate - a.risingRate)
+    .slice(0, 3);
+
+  if (!top3.length) {
+    container.innerHTML = '<div style="padding:20px;font-size:13px;color:var(--gray-4);">급상승 데이터가 없어요</div>';
+    return;
   }
-  buildLegend(kws);
-  drawChart(7);
-  setupPeriodTabs();
-  if (hasCategory) setupCatTabs();
-  rebuildHistoryTabs();
+
+  const itemCls = ['i1', 'i2', 'i3'];
+  const rankLabels = ['1ST RISING', '2ND RISING', '3RD RISING'];
+
+  container.innerHTML = `<div class="rising3-wrap">${top3.map((kw, i) => {
+    const rateStr = kw.risingRate >= 1000
+      ? '+' + (kw.risingRate / 1000).toFixed(1) + 'K%'
+      : '+' + Math.round(kw.risingRate) + '%';
+    const badge = kw.blogSurge
+      ? '<span class="rising3-badge rising3-badge-surge">📈 포스팅 급등</span>'
+      : kw.isEarlyTrend
+        ? '<span class="rising3-badge rising3-badge-early">🚀 조기감지</span>'
+        : kw.isNew
+          ? '<span class="rising3-badge rising3-badge-new">NEW</span>'
+          : '';
+    const comment = kw.comment || '';
+
+    return `<div class="rising3-item ${itemCls[i]}" onclick="openKwDetail('${kw.keyword.replace(/'/g,"\'")}')">
+      <div class="rising3-rank-row">
+        <span class="rising3-rank">${rankLabels[i]}</span>
+        ${badge}
+      </div>
+      <div class="rising3-kw">${kw.keyword}</div>
+      <div class="rising3-bottom">
+        <div class="rising3-rate">${rateStr}</div>
+        ${comment ? `<div class="rising3-comment">${comment}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('')}</div>`;
 }
 
 // ── 랭킹 행 빌드 ──
 function buildRankRows(kws) {
-  const filtered = activeCat === 'all' ? kws : kws.filter(k => k.category === activeCat);
-  if (!filtered.length) return `<div style="padding:40px;text-align:center;color:var(--gray-3);font-size:13px;">해당 카테고리 데이터가 없어요</div>`;
+  const filtered = kws;
+  if (!filtered.length) return `<div style="padding:40px;text-align:center;color:var(--gray-3);font-size:13px;">데이터가 없어요</div>`;
 
   function buildRow(kw, i) {
     const numCls = kw.rank===1?'top1':kw.rank===2?'top2':kw.rank===3?'top3':'';
-    const isChecked = selectedTop5Kw === kw.keyword;
+    const isChecked = false;
     const accentColor = isChecked ? 'var(--green)' : (kw.rank <= 3 ? 'var(--gray-2)' : 'var(--gray-5)');
     const badges = [
       kw.isEarlyTrend ? '<span class="badge badge-early">🚀 조기감지</span>' : '',
@@ -891,9 +854,8 @@ function buildRankRows(kws) {
           </div>
           ${rateHtml(kw.changeRate)}
           <div class="score-col" style="text-align:right;font-size:13px;font-weight:800;color:var(--green);font-variant-numeric:tabular-nums;">${kw.score || '—'}</div>
-          <div class="sparkline-col">${sparkline(kw.scoreValues && kw.scoreValues.length > 1 ? kw.scoreValues : [], 72, 28, isChecked)}</div>
+          <div class="sparkline-col">${sparkline(kw.postValues && kw.postValues.length > 0 ? kw.postValues : [], 72, 28, isChecked)}</div>
         </div>
-        <div class="detail-panel" id="panel-${i}"></div>
       </div>`;
   }
 
@@ -975,15 +937,13 @@ function openKwDetail(keyword) {
   setTimeout(() => {
     if (kwDetailChartInstance) { kwDetailChartInstance.destroy(); kwDetailChartInstance = null; }
     const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
-    if (!ctx || !kw.values) return;
-    const days = 28;
-    // scoreValues 사용 (트렌드 지수 시계열)
-    const scoreArr = kw.scoreValues && kw.scoreValues.length > 1
-      ? kw.scoreValues
-      : [kw.score || 0];
-    const values = scoreArr.length >= days
-      ? scoreArr.slice(-days)
-      : [...Array(days - scoreArr.length).fill(null), ...scoreArr];
+    if (!ctx) return;
+    // postValues: 날짜별 포스팅 수 절댓값 그래프
+    const postArr = kw.postValues && kw.postValues.length > 0 ? kw.postValues : [];
+    const days = Math.max(postArr.length, 7); // 최소 7일 축
+    const values = postArr.length >= days
+      ? postArr.slice(-days)
+      : [...Array(days - postArr.length).fill(null), ...postArr];
     const labels = Array.from({length: days}, (_, i) => {
       const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
       return (d.getMonth()+1) + '/' + d.getDate();
@@ -1018,7 +978,11 @@ function openKwDetail(keyword) {
           borderColor: '#2DB400',
           backgroundColor: 'rgba(45,180,0,0.08)',
           borderWidth: 2,
-          pointRadius: 0,
+          pointRadius: (ctx) => {
+            // 데이터 1개면 점으로 표시, 2개 이상이면 선
+            const nonNull = values.filter(v => v !== null);
+            return nonNull.length <= 1 ? 4 : 0;
+          },
           pointHoverRadius: 4,
           tension: 0.4,
           fill: true,
@@ -1037,7 +1001,7 @@ function openKwDetail(keyword) {
         }},
         scales: {
           x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { color: '#E8E8E8' } },
-          y: { min: 0, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, callback: v => v }, border: { color: '#E8E8E8' } }
+          y: { min: 0, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, callback: v => v >= 10000 ? (v/10000).toFixed(0)+'만' : v >= 1000 ? (v/1000).toFixed(0)+'K' : v }, border: { color: '#E8E8E8' } }
         }
       }
     });
@@ -1057,170 +1021,9 @@ function closePostsModal(e) {
   document.body.style.overflow = '';
 }
 
-// ── 카테고리 탭 ──
-function setupCatTabs() {
-  document.querySelectorAll('.cat-tab').forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll('.cat-tab').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
-      activeCat = btn.dataset.cat;
-      document.getElementById('rankList').innerHTML = buildRankRows(globalKws);
-    };
-  });
-}
+
 
 // ── 범례 ──
-
-function buildLegend(kws) {
-  const container = document.getElementById('chartLegend');
-  if (!container) return;
-  const top5 = kws.slice(0, 5);
-  container.innerHTML = top5.map((kw) => {
-    const isSelected = selectedTop5Kw === kw.keyword;
-    // peak 시점 계산
-    const vals = (kw.scoreValues && kw.scoreValues.length > 1) ? kw.scoreValues : (kw.values || []);
-    const peakIdx = vals.length ? vals.indexOf(Math.max(...vals)) : -1;
-    const peakDaysAgo = peakIdx >= 0 ? vals.length - 1 - peakIdx : -1;
-    const peakLabel = peakDaysAgo === 0 ? '오늘 최고점'
-      : peakDaysAgo === 1 ? '어제 최고점'
-      : peakDaysAgo > 1 ? peakDaysAgo + '일 전 최고점' : '';
-
-    return `<div class="legend-item${isSelected?' active':''}" onclick="selectTop5Kw('${kw.keyword.replace(/'/g,"\\'")}')">
-      <div class="legend-dot"></div>
-      <div style="display:flex;flex-direction:column;gap:1px;">
-        <span>${kw.keyword}</span>
-        ${isSelected && peakLabel ? `<span style="font-size:10px;color:var(--green-dark);font-weight:700;">${peakLabel}</span>` : ''}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function selectTop5Kw(keyword) {
-  selectedTop5Kw = selectedTop5Kw === keyword ? null : keyword;
-  buildLegend(globalKws);
-  const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
-  drawChart(activeDays);
-}
-
-
-// ── 메인 차트 ──
-function drawChart(days) {
-  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
-  const ctx = document.getElementById('trendChart')?.getContext('2d');
-  if (!ctx) return;
-
-  // TOP5 항상 고정 (1~5위), 히스토리 모드에서도 TOP5
-  const sourceKws = activeHistoryIdx === -1
-    ? globalKws.slice(0, 5)
-    : (() => {
-        const h = globalHistory[activeHistoryIdx];
-        return h ? h.keywords.slice(0, 5).map(k => ({
-          ...k, values: globalKws.find(g => g.keyword === k.keyword)?.values || []
-        })) : globalKws.slice(0, 5);
-      })();
-
-  const labels = Array.from({length: days}, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
-    return `${d.getMonth()+1}/${d.getDate()}`;
-  });
-
-  const datasets = sourceKws.map((kw, i) => {
-    // scoreValues 사용 (트렌드 지수 시계열), 없으면 현재 score 단일값
-    const scoreRaw = kw.scoreValues && kw.scoreValues.length > 1
-      ? kw.scoreValues.slice(-days)
-      : Array(days).fill(null).map((_, j) => j === days - 1 ? (kw.score || 0) : null);
-
-    const isSelected = selectedTop5Kw
-      ? kw.keyword === selectedTop5Kw
-      : i === 0;
-    const lineColor = isSelected ? '#2DB400' : '#CCCCCC';
-    const lineWidth = isSelected ? 2.5 : 1.2;
-    const fillColor = isSelected ? 'rgba(45,180,0,0.08)' : 'transparent';
-
-    return {
-      label: kw.keyword,
-      data: scoreRaw,
-      borderColor: lineColor,
-      backgroundColor: fillColor,
-      borderWidth: lineWidth,
-      pointRadius: isSelected ? 3 : 1,
-      pointHoverRadius: 5,
-      borderDash: isSelected ? [] : [4, 3],
-      tension: 0.4,
-      fill: isSelected,
-      spanGaps: false,
-      order: isSelected ? 0 : 1,
-    };
-  });
-
-
-  chartInstance = new Chart(ctx, {
-    type: 'line',
-    data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      layout: { padding: { top: 16, bottom: 8, left: 4, right: 8 } },
-      interaction: { mode: 'index', intersect: false },
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          backgroundColor: '#fff', borderColor: '#E8E8E8', borderWidth: 1,
-          titleColor: '#111', bodyColor: '#555',
-          titleFont: { family: 'Pretendard', size: 12, weight: '700' },
-          bodyFont: { family: 'Pretendard', size: 11 }, padding: 10,
-        }
-      },
-      scales: {
-        x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' } }, border: { color: '#E8E8E8' } },
-        y: { min: 0,
-          grid: { color: '#F4F4F4' },
-          ticks: { color: '#AAAAAA', font: { size: 11, family: 'Pretendard' }, callback: v => v },
-          border: { color: '#E8E8E8' }
-        }
-      }
-    }
-  });
-}
-
-// ── period tabs ──
-function setupPeriodTabs() {
-  document.querySelectorAll('.tab-btn:not(.tab-btn-disabled)').forEach(btn => {
-    btn.onclick = () => {
-      document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
-      btn.classList.add('active');
-      drawChart(parseInt(btn.dataset.days));
-    };
-  });
-}
-
-// ── history tabs ──
-function rebuildHistoryTabs() {
-  const row = document.getElementById('historyRow');
-  if (!row) return;
-
-  const recent5 = globalHistory.slice().reverse().slice(0, 5);
-  const hasMore = globalHistory.length > 5;
-
-  const tabs = recent5.map((h, i) => {
-    const origIdx = globalHistory.length - 1 - i;
-    return `<button class="history-tab${activeHistoryIdx === origIdx ? ' active' : ''}" data-idx="${origIdx}">${fmtHistLabel(h.timestamp, h.date)}</button>`;
-  }).join('');
-
-  row.innerHTML = `
-    <button class="history-tab${activeHistoryIdx === -1 ? ' active' : ''}" data-idx="-1">현재</button>
-    ${tabs}
-    ${hasMore ? '<span class="history-more" onclick="openHistModal()">+ 더 보기</span>' : ''}
-  `;
-
-  row.querySelectorAll('.history-tab').forEach(btn => {
-    btn.onclick = () => {
-      activeHistoryIdx = parseInt(btn.dataset.idx);
-      rebuildHistoryTabs();
-      const activeDays = parseInt(document.querySelector('.tab-btn.active')?.dataset.days || '7');
-      drawChart(activeDays);
-    };
-  });
-}
 
 // ── 히스토리 팝업 ──
 function openHistModal() {
