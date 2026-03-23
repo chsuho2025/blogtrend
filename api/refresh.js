@@ -73,9 +73,24 @@ async function collectBlogTitles() {
     }
   }
 
-  const filtered = allTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
-  const filteredRecent = recentTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
-  const filteredOlder = olderTitles.filter(t => !NOISE_PATTERNS.some(p => p.test(t)));
+  // 제목 사전 필터: 너무 짧거나 범용어 수준 제목 제거
+  const TITLE_STOP = new Set(['봄', '여름', '가을', '겨울', '신상', '후기', '추천', '리뷰', '레시피', '꿀팁']);
+  const preFilter = t => {
+    if (!NOISE_PATTERNS.every(p => !p.test(t))) return false; // 노이즈 패턴
+    if (t.replace(/\s/g, '').length < 8) return false;        // 공백 제거 후 8자 미만
+    if (TITLE_STOP.has(t.trim())) return false;               // 단일 범용어 제목
+    return true;
+  };
+
+  const filtered = allTitles.filter(preFilter);
+  const filteredRecent = recentTitles.filter(preFilter);
+  const filteredOlder = olderTitles.filter(preFilter);
+
+  // 셔플: NET_KEYWORDS 순서 편향 제거 → chunk 균질화
+  for (let i = filtered.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [filtered[i], filtered[j]] = [filtered[j], filtered[i]];
+  }
 
   // 명사구 단위 빈도 계산 (서술어/형용사 어미 제외)
   const tokenize = titles => {
@@ -133,9 +148,9 @@ async function extractTrendKeywords(titles, risingWords = []) {
   const CHUNK_SIZE = 400;
   const allKeywords = [];
 
-  // risingWords 상위 20개를 프롬프트에 힌트로 제공
-  const risingHint = risingWords.length > 0
-    ? `\n\n참고: 최근 3일간 블로그에서 급상승한 단어들이야. 이 단어가 포함된 키워드를 우선적으로 뽑아줘:\n${risingWords.slice(0, 20).join(', ')}`
+  // 급상승 단어를 system 프롬프트에 컨텍스트로 통합 (user 메시지 오염 방지)
+  const risingContext = risingWords.length > 0
+    ? `\n\n[급상승 신호] 최근 3일간 블로그에서 특히 많이 등장한 단어들이야. 이 단어들이 포함된 구체적인 제품명/이벤트명/트렌드어를 우선 포착해:\n${risingWords.slice(0, 15).join(', ')}`
     : '';
 
   for (let i = 0; i < Math.min(titles.length, 1600); i += CHUNK_SIZE) {
@@ -158,29 +173,32 @@ async function extractTrendKeywords(titles, risingWords = []) {
 아래 블로그 제목들에서 "지금 전국민이 네이버에서 검색하는 트렌드 키워드" 15개만 뽑아줘.
 반드시 15개 이하로만 뽑아. 15개를 초과하면 절대 안 돼.
 
-뽑아야 할 것:
-- 전국민이 검색하는 제품명/음식명 (예: 황치즈칩, 버터떡, 닌텐도 스위치, 에브리봇)
-- 브랜드+카테고리 (예: 자라 봄신상, 스타벅스 신메뉴, 메가커피 봄신메뉴)
-- 지금 막 뜨는 트렌드어 (예: 갓생루틴, 무지출챌린지, 두바이 찰떡파이)
-- 영화/드라마/게임 타이틀 (예: 아카데미 시상식, 케이팝 데몬 헌터스)
+★ 뽑아야 할 것 (반드시 아래 형태여야 함):
+- 브랜드+제품 조합 (예: 맥도날드 짱구 해피밀, 나이키 체리블라썸 운동화, 스타벅스 딸기 라떼)
+- 음식/식품명 (예: 황치즈칩, 버터떡, 두바이 찰떡파이, 흑백요리사 레시피)
+- 지금 화제인 이벤트/시상식/공연 (예: 아카데미 시상식, BTS 광화문 콘서트)
+- 지금 막 뜨는 트렌드어 (예: 갓생 루틴, 무지출 챌린지)
+- 영화/드라마/게임 타이틀 (예: 케이팝 데몬 헌터스, 붉은사막, 프로젝트 헤일메리)
 
-절대 뽑지 말 것:
-- 연예인/인물 이름 (예: 이영애, 신봉선, 이휘재, 쯔양, 장영란, 한소희, 장원영)
-- 방송 프로그램/회차 (예: 나솔사계, 현역가왕3, 나는솔로 22기, 나솔 30기)
-- 법률/의료/부동산 광고 (예: 손해배상변호사, 그루밍성범죄, 파주성범죄로펌, 강남변호사)
-- 지역 상호명/맛집 (예: 선릉 버터떡 맛집, 경복궁맛집 푸페또클럽, 을지로 돌판집)
-- 모델번호/시리얼 (예: LG휘센 SQ09B9JWBS, NT930X5JK82S, LG 15인치 놀라운생각)
-- 범용어 단독 (예: 다이어트, 홈트레이닝, 영등포, 가디건, 인테리어, 맛집, 후기)
-- 날짜/채용/일정 (예: 2026년 3월 15일, 2026 CJ제일제당 채용)
-- 블로그 제목 그대로 (예: 선릉 버터떡 맛집 후기 다녀왔어요)
-- 단독 단어 (예: 화이트, 스마트, 분위기, 직장인, 드라마, 비교)
+★ 절대 뽑으면 안 되는 것:
+- 단일 브랜드명만 (나쁨: "나이키", "아디다스", "이마트" → 반드시 뒤에 제품/카테고리 붙어야 함)
+- 단일 범용어 (나쁨: "레시피", "피부", "가디건", "강아지", "웨이팅", "해결")
+- 5자 이하 단독어 (나쁨: "봄", "루틴", "하울", "갓생", "피부")
+- 연예인/인물 이름 단독 (나쁨: "풍자", "김현숙", "이준호", "카리나" → 이름+이벤트 조합만 허용)
+- 방송 프로그램/회차 (나쁨: 나솔사계, 현역가왕3, 미우새, 편스토랑)
+- 다이어트/체중 인물 서사 (나쁨: "풍자 28kg 감량", "김현숙 다이어트")
+- 법률/의료/부동산 광고
+- 지역 상호명/맛집명 (나쁨: "선릉 버터떡 맛집", "성수 오밀파스타")
+- 모델번호/시리얼번호
+- 날짜/채용/일정 정보
+- 블로그 제목 그대로 복사${risingContext}
 
 반드시 JSON 배열로만, 15개 이하: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
               },
               {
                 role: 'user',
-                content: chunk.join('\n') + risingHint,
+                content: chunk.join('\n'),
               },
             ],
             maxCompletionTokens: 2000,
@@ -215,11 +233,24 @@ async function extractTrendKeywords(titles, risingWords = []) {
     /태교여행/, /육아박스/, /이유식/, /임신초기/,
     /나솔/, /현역가왕/, /핫딜/, /공매도/, /파산/, /챌린지$/,
   ];
+  // 범용 단일어 코드 레벨 차단 목록
+  const SINGLE_STOP = new Set([
+    '나이키', '아디다스', '이마트', '쿠팡', '다이소', '올리브영', '스타벅스',
+    '맥도날드', '배달의민족', '카카오', '네이버', '삼성', '애플', '구글',
+    '레시피', '피부', '가디건', '강아지', '고양이', '루틴', '갓생', '무지출',
+    '웨이팅', '해결', '추천', '후기', '리뷰', '꿀팁', '하울', '언박싱',
+    '다이어트', '홈트', '자취', '봄', '여름', '가을', '겨울', '신상',
+  ]);
+
   const filtered = allKeywords.filter(kw => {
     if (typeof kw !== 'string') return false;
     if (kw.length < 2) return false;
     if (/[\[\]【】()（）<>《》]/.test(kw)) return false;
     if (NOISE_KW.some(p => p.test(kw))) return false;
+    // 단일어 강화 필터: 공백 없는 4자 미만 또는 차단 목록
+    const noSpace = kw.replace(/\s+/g, '');
+    if (noSpace.length < 4 && !kw.includes(' ')) return false;
+    if (SINGLE_STOP.has(kw.trim())) return false;
     const n = norm(kw);
     if (seenNorm.has(n)) return false;
     seenNorm.add(n);
@@ -252,16 +283,25 @@ async function deduplicateByMeaning(newKeywords, existingKeywords) {
           messages: [
             {
               role: 'system',
-              content: `너는 키워드 중복 제거 전문가야.
+              content: `너는 키워드 품질 심사 및 중복 제거 전문가야.
 
-아래 "신규 키워드" 목록에서 서로 같은 이슈/인물/이벤트를 가리키는 중복 키워드를 제거하고,
-또한 "기존 키워드"와 같은 이슈를 가리키는 신규 키워드도 제거해줘.
+아래 "신규 키워드" 목록을 두 가지 기준으로 필터링해줘.
 
-중복 판단 기준:
-- 같은 인물/그룹의 다른 표현 (예: BTS = 방탄소년단)
-- 같은 이벤트의 다른 표현 (예: "BTS 광화문 콘서트" = "방탄소년단 광화문 공연" = "BTS 컴백 콘서트")
-- 같은 제품/브랜드의 다른 표현 (예: "삼성전자 배당금" = "삼성전자 특별배당금")
-- 중복 중 가장 구체적이고 검색량이 많을 것 같은 키워드 1개만 남길 것
+[1단계: 품질 제거]
+아래에 해당하면 제거:
+- 단일 브랜드명만 (예: "나이키", "아디다스", "이마트", "스타벅스")
+- 단일 범용어 (예: "레시피", "피부", "가디건", "강아지", "루틴", "해결")
+- 연예인/방송인 이름 단독 (예: "풍자", "카리나", "이준호")
+- 다이어트/체중 인물 서사 (예: "풍자 28kg 감량", "김현숙 다이어트")
+- 방송 프로그램/회차 (예: "나솔사계", "미우새", "편스토랑")
+- 네이버에서 실제로 검색할 것 같지 않은 키워드
+
+[2단계: 의미 중복 제거]
+- 같은 인물/그룹의 다른 표현 (BTS = 방탄소년단)
+- 같은 이벤트의 다른 표현 (BTS 광화문 콘서트 = 방탄소년단 광화문 공연 = BTS 컴백 콘서트)
+- 같은 제품/브랜드의 다른 표현 (삼성전자 배당금 = 삼성전자 특별배당금)
+- 기존 키워드와 같은 이슈를 다루는 신규 키워드
+- 중복 중 가장 구체적이고 검색량이 많을 것 같은 1개만 남길 것
 
 반드시 JSON 배열로만: ["남길키워드1", "남길키워드2", ...]
 제거 없이 다 남기는 것도 가능. 다른 설명 없이 JSON만.`,
