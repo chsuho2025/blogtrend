@@ -945,7 +945,11 @@ module.exports = async (req, res) => {
     if (!rawTrends.length) throw new Error('트렌드 조회 실패');
 
     // 자가학습: DataLab 0.00 키워드 자동 블랙리스트 업데이트 (상위 랭킹 키워드는 제외)
-    const top20Kws = ranked.slice(0, 20).map(k => k.keyword);
+    // ranked는 아직 미정의 → rawTrends weeklyRate 기준 상위 20개를 보호 대상으로 설정
+    const top20Kws = [...rawTrends]
+      .sort((a, b) => b.weeklyRate - a.weeklyRate)
+      .slice(0, 20)
+      .map(k => k.keyword);
     await updateAutoBlacklist(rawTrends, top20Kws);
 
     // null 제외하고 medianPost 계산
