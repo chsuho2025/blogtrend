@@ -338,7 +338,10 @@ async function updateAutoBlacklist(rawTrends) {
   try {
     const zeroKws = rawTrends
       .filter(t => {
-        const avg7 = t.values.slice(-7).reduce((a, b) => a + b, 0) / 7;
+        if (!t.values || t.values.length === 0) return false;
+        const slice = t.values.slice(-7).filter(v => v != null);
+        if (slice.length === 0) return false;
+        const avg7 = slice.reduce((a, b) => a + b, 0) / slice.length;
         return avg7 < 0.1; // 7일 평균 0.1 미만 = 사실상 0
       })
       .map(t => t.keyword);
@@ -1086,6 +1089,20 @@ module.exports = async (req, res) => {
     });
     console.log('[신규 키워드]', finalRanked.filter(k => k.isNew).map(k => k.keyword));
 
+    // post_history 읽기 — polishKeywords 전에 원본 keyword로 조회 (중요: polish 후 keyword 불일치 방지)
+    const originalKeywords = finalRanked.map(k => k.keyword);
+    const postHistoryCache = {};
+    await Promise.all(originalKeywords.map(async (origKw, i) => {
+      try {
+        const raw = await redis.get(`post_history:${origKw}`);
+        if (raw) {
+          const hist = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          hist.sort((a, b) => a.date.localeCompare(b.date));
+          postHistoryCache[i] = hist.map(h => h.count); // index 기반 저장
+        }
+      } catch(e) {}
+    }));
+
     // 키워드 정제 + 카테고리 분류
     const { names: polishedNames, categories } = await polishKeywords(finalRanked.map(k => k.keyword));
     console.log('[polishKeywords] 정제 결과:', polishedNames.slice(0, 5));
@@ -1126,6 +1143,7 @@ module.exports = async (req, res) => {
         comment: comments[i] || '',
         values: k.values.slice(-28),
         scoreValues: [Math.round(k.score * 100)], // score_history 누적 후 rank.js에서 확장
+        postValues: postHistoryCache[i] || (k.postCount ? [k.postCount] : []),
       })),
       rising: risingRanked.map((k, i) => ({
         rank: i + 1,

@@ -22,7 +22,10 @@ async function getBlogGrowth(keywords) {
   const now = new Date().toISOString();
   const results = [];
 
-  await Promise.all(keywords.map(async (kw) => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  for (let ci = 0; ci < keywords.length; ci += 5) {
+    const chunk = keywords.slice(ci, ci + 5);
+    await Promise.all(chunk.map(async (kw) => {
     try {
       const res = await fetch(
         `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(kw)}&display=1`,
@@ -77,6 +80,8 @@ async function getBlogGrowth(keywords) {
       results.push({ keyword: kw, postCount: 0, blogGrowth: 0, hasEnoughData: false, growthHistoryCount: 0 });
     }
   }));
+    if (ci + 5 < keywords.length) await sleep(120);
+  }
 
   return results;
 }
@@ -259,14 +264,23 @@ module.exports = async (req, res) => {
 
     const rankUpdatedAt = new Date().toISOString();
 
-    // score_history 읽기
+    // score_history + post_history 읽기
     const scoreHistMap = {};
+    const postHistMap = {};
     await Promise.all(finalRanked.map(async k => {
       try {
-        const stored = await redis.get(`score_history:${k.keyword}`);
-        if (stored) {
-          const hist = typeof stored === 'string' ? JSON.parse(stored) : stored;
+        const [scoreRaw, postRaw] = await Promise.all([
+          redis.get(`score_history:${k.keyword}`),
+          redis.get(`post_history:${k.keyword}`),
+        ]);
+        if (scoreRaw) {
+          const hist = typeof scoreRaw === 'string' ? JSON.parse(scoreRaw) : scoreRaw;
           scoreHistMap[k.keyword] = hist.map(h => h.score);
+        }
+        if (postRaw) {
+          const hist = typeof postRaw === 'string' ? JSON.parse(postRaw) : postRaw;
+          hist.sort((a, b) => a.date.localeCompare(b.date));
+          postHistMap[k.keyword] = hist.map(h => h.count);
         }
       } catch(e) {}
     }));
@@ -295,6 +309,7 @@ module.exports = async (req, res) => {
         comment: prevKeywords.find(p => p.keyword === k.keyword)?.comment || '',
         values: k.values.slice(-28),
         scoreValues: scoreHistMap[k.keyword] || [Math.round(k.emaScore * 100)],
+        postValues: postHistMap[k.keyword] || (k.postCount ? [k.postCount] : []),
       })),
       rising: risingRanked.map((k, i) => ({
         rank: i + 1,

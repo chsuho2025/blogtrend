@@ -39,6 +39,7 @@ module.exports = async (req, res) => {
         comment: k.comment || '',
         values: k.values || [],
         scoreValues: k.scoreValues || [k.score || 0],
+        postValues: k.postValues || (k.postCount ? [k.postCount] : []),
       })),
       rising: data.rising || [],
       earlyTrends: data.earlyTrends || [],
