@@ -938,15 +938,6 @@ function openKwDetail(keyword) {
     if (kwDetailChartInstance) { kwDetailChartInstance.destroy(); kwDetailChartInstance = null; }
     const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
     if (!ctx) return;
-    // 차트 부제목: 일별 신규 포스팅 수
-    const chartTitle = document.querySelector('.kw-detail-chart-wrap');
-    if (chartTitle && !chartTitle.querySelector('.chart-subtitle')) {
-      const sub = document.createElement('div');
-      sub.className = 'chart-subtitle';
-      sub.style.cssText = 'font-size:10px;color:var(--gray-4);text-align:right;margin-bottom:4px;';
-      sub.textContent = peakLabel ? `검색지수 (28일) · ${peakLabel}` : '검색지수 (28일)';
-      chartTitle.insertBefore(sub, chartTitle.firstChild);
-    }
     // values(검색지수): 28일치 즉시 제공, 키워드별 피크 시점 파악에 최적
     const rawValues = kw.values && kw.values.length > 0 ? kw.values : [];
     const days = 28;
@@ -957,12 +948,21 @@ function openKwDetail(keyword) {
       const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
       return (d.getMonth()+1) + '/' + d.getDate();
     });
-    // 피크 날짜 계산
+    // 피크 날짜 계산 (정의 먼저)
     const peakIdx = values.reduce((best, v, i) => (v != null && (best === -1 || v > values[best])) ? i : best, -1);
     const peakDaysAgo = peakIdx >= 0 ? days - 1 - peakIdx : -1;
     const peakLabel = peakDaysAgo === 0 ? '오늘 최고점'
       : peakDaysAgo === 1 ? '어제 최고점'
       : peakDaysAgo > 1 ? `${peakDaysAgo}일 전 최고점` : '';
+    // 차트 부제목 (peakLabel 계산 후 삽입)
+    const chartTitle = document.querySelector('.kw-detail-chart-wrap');
+    if (chartTitle && !chartTitle.querySelector('.chart-subtitle')) {
+      const sub = document.createElement('div');
+      sub.className = 'chart-subtitle';
+      sub.style.cssText = 'font-size:10px;color:var(--gray-4);text-align:right;margin-bottom:4px;';
+      sub.textContent = peakLabel ? `검색지수 (28일) · ${peakLabel}` : '검색지수 (28일)';
+      chartTitle.insertBefore(sub, chartTitle.firstChild);
+    }
     // 게시글 비동기 로드
     fetch('/api/posts?keyword=' + encodeURIComponent(keyword) + '&display=20')
       .then(r => r.json())
