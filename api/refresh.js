@@ -335,10 +335,11 @@ async function deduplicateByMeaning(newKeywords, existingKeywords) {
 // ─────────────────────────────────────────
 async function cleanPoolDuplicates(pool) {
   // pool 전체 키워드 중 의미 중복 제거 (앵커 포함)
-  // 호출 비용 절감을 위해 40개 이하일 때만 실행
   const keywords = pool.map(p => p.keyword);
   if (keywords.length === 0) return pool;
   try {
+    // 앞 20개만 처리 (토큰 초과 방지 + 앵커 위주로 정리)
+    const targetKeywords = keywords.slice(0, 20);
     const res = await fetch(
       'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
       {
@@ -367,10 +368,10 @@ async function cleanPoolDuplicates(pool) {
             },
             {
               role: 'user',
-              content: keywords.join('\n'),
+              content: targetKeywords.join('\n'),
             },
           ],
-          maxCompletionTokens: 600,
+          maxCompletionTokens: 3000,
           temperature: 0.1,
           repetitionPenalty: 1.0,
           thinking: { effort: 'none' },
@@ -383,7 +384,10 @@ async function cleanPoolDuplicates(pool) {
     if (!Array.isArray(cleaned) || cleaned.length === 0) return pool;
 
     const cleanedSet = new Set(cleaned.map(k => k.trim()));
-    const result = pool.filter(p => cleanedSet.has(p.keyword));
+    // 앞 20개는 정리된 결과로, 나머지는 그대로 유지
+    const front = pool.slice(0, 20).filter(p => cleanedSet.has(p.keyword));
+    const rest = pool.slice(20);
+    const result = [...front, ...rest];
     console.log(`[cleanPoolDuplicates] ${pool.length}개 → ${result.length}개 (${pool.length - result.length}개 중복 정리)`);
     return result;
   } catch (e) {
@@ -890,8 +894,16 @@ module.exports = async (req, res) => {
     })
     .sort((a, b) => b.score - a.score);
 
-    // 최종 랭킹
-    const finalRanked = ranked.slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
+    // 최종 랭킹 — AI 기반 의미 중복 제거 후 상위 20개
+    // ranked 상위 30개를 AI에게 넘겨서 같은 이슈 중복 제거 (높은 점수 키워드 우선 유지)
+    const top30Keywords = ranked.slice(0, 30).map(k => k.keyword);
+    const dedupedKeywords = await deduplicateByMeaning(top30Keywords, []);
+    const dedupedSet = new Set(dedupedKeywords);
+    const deduped = ranked.filter(k => dedupedSet.has(k.keyword)).slice(0, 20);
+    // deduplicateByMeaning 실패 시 fallback
+    const finalRanked = (deduped.length >= 5 ? deduped : ranked.slice(0, 20))
+      .map((k, i) => ({ ...k, rank: i + 1 }));
+    console.log('[finalRanked] 중복제거 후:', finalRanked.length, '개', finalRanked.slice(0,3).map(k=>k.keyword));
 
     const risingRanked = [...finalRanked]
       .filter(k => k.risingRate > 0)
