@@ -840,7 +840,7 @@ module.exports = async (req, res) => {
         isNew: k.isNew,
         comment: comments[i] || '',
         values: k.values.slice(-28),
-        scoreValues: [Math.round(k.score * 100)], // 오늘 score 저장, score_history 누적 후 rank.js에서 확장
+        scoreValues: [k.score], // 이미 Math.round(원점수*100), score_history 누적 후 rank.js에서 확장
       })),
       rising: risingRanked.map((k, i) => ({
         rank: i + 1,
