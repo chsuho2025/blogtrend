@@ -268,7 +268,7 @@ async function extractTrendKeywords(titles, risingWords = []) {
                 content: chunk.join('\n'),
               },
             ],
-            maxCompletionTokens: 2000,
+            maxCompletionTokens: 3000,
             temperature: 0.3,
             repetitionPenalty: 1.1,
             thinking: { effort: 'none' },
@@ -303,6 +303,7 @@ async function extractTrendKeywords(titles, risingWords = []) {
     /퀴즈/, /정답/, /OX퀴즈/, /적립금/, /쿠폰받기/, /무료나눔/, /선착순/,
     /지원금/, /장려금/, /보조금/, /바우처/, /페이래플/, /앱테크/, /리워드/,
     /공모주/, /청약/, /배당금/, /주가/, /코스피/, /코스닥/, /비트코인/,
+    /코인/, /암호화폐/, /가상화폐/, /거래소/, /디지털자산/, /NFT/,
   ];
   // 최소 코드 필터: 공백 제거 후 3자 이하 단일어만 차단
   // (나머지 범용어는 autoBlacklist + AI 게이팅에 위임)
@@ -334,15 +335,20 @@ async function extractTrendKeywords(titles, risingWords = []) {
 // ─────────────────────────────────────────
 // Step 자가학습: DataLab 0.00 자동 블랙리스트
 // ─────────────────────────────────────────
-async function updateAutoBlacklist(rawTrends) {
+async function updateAutoBlacklist(rawTrends, top20Keywords = []) {
   try {
+    const top20Set = new Set(top20Keywords.map(k => k.toLowerCase().replace(/\s+/g, '')));
     const zeroKws = rawTrends
       .filter(t => {
         if (!t.values || t.values.length === 0) return false;
         const slice = t.values.slice(-7).filter(v => v != null);
         if (slice.length === 0) return false;
         const avg7 = slice.reduce((a, b) => a + b, 0) / slice.length;
-        return avg7 < 0.1; // 7일 평균 0.1 미만 = 사실상 0
+        if (avg7 >= 0.1) return false; // 검색지수 있으면 제외
+        // 현재 상위 랭킹 키워드는 블랙리스트 제외 (DataLab 지연 가능성)
+        const norm = t.keyword.toLowerCase().replace(/\s+/g, '');
+        if (top20Set.has(norm)) return false;
+        return true;
       })
       .map(t => t.keyword);
 
@@ -938,8 +944,9 @@ module.exports = async (req, res) => {
     const rawTrends = await getSearchTrends(dedupedPool);
     if (!rawTrends.length) throw new Error('트렌드 조회 실패');
 
-    // 자가학습: DataLab 0.00 키워드 자동 블랙리스트 업데이트
-    await updateAutoBlacklist(rawTrends);
+    // 자가학습: DataLab 0.00 키워드 자동 블랙리스트 업데이트 (상위 랭킹 키워드는 제외)
+    const top20Kws = ranked.slice(0, 20).map(k => k.keyword);
+    await updateAutoBlacklist(rawTrends, top20Kws);
 
     // null 제외하고 medianPost 계산
     const postValues = dedupedPool.map(kw => poolPostMap[kw]).filter(v => v != null);
