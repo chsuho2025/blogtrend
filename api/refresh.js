@@ -23,8 +23,6 @@ const NET_KEYWORDS = [
 async function collectBlogTitles() {
   const seenTitles = new Set();
   const allTitles = [];
-  let rawCount = 0;
-
   const NOISE_PATTERNS = [
     /\d{2,4}-\d{3,4}-\d{4}/,
     /010[-.]?\d{4}[-.]?\d{4}/,
@@ -51,7 +49,6 @@ async function collectBlogTitles() {
       });
       const data = await res.json();
       if (data.items) {
-        rawCount += data.items.length;
         data.items.forEach((item, idx) => {
           const title = item.title
             .replace(/<[^>]+>/g, '')
@@ -788,7 +785,7 @@ module.exports = async (req, res) => {
     .sort((a, b) => b.score - a.score);
 
     // 최종 랭킹
-    const finalRanked = ranked.sort((a, b) => b.score - a.score).slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
+    const finalRanked = ranked.slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
 
     const risingRanked = [...finalRanked]
       .filter(k => k.risingRate > 0)
