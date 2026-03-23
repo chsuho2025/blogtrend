@@ -137,7 +137,6 @@ async function extractTrendKeywords(titles, risingWords = []) {
   const allKeywords = [];
 
   // risingWords 상위 20개를 프롬프트에 힌트로 제공
-  // risingWords 상위 20개를 프롬프트에 힌트로 제공
   const risingHint = risingWords.length > 0
     ? `\n\n참고: 최근 3일간 블로그에서 급상승한 단어들이야. 이 단어가 포함된 키워드를 우선적으로 뽑아줘:\n${risingWords.slice(0, 20).join(', ')}`
     : '';
@@ -184,7 +183,7 @@ async function extractTrendKeywords(titles, risingWords = []) {
               },
               {
                 role: 'user',
-                content: chunk.join('\n'),
+                content: chunk.join('\n') + risingHint,
               },
             ],
             maxCompletionTokens: 2000,
@@ -235,6 +234,66 @@ async function extractTrendKeywords(titles, risingWords = []) {
 }
 
 // ─────────────────────────────────────────
+// Step 3-1: AI 기반 의미 중복 제거
+// ─────────────────────────────────────────
+async function deduplicateByMeaning(newKeywords, existingKeywords) {
+  if (newKeywords.length === 0) return [];
+  try {
+    const newList = newKeywords.map((k, i) => `NEW_${i}: ${k}`).join('\n');
+    const existList = existingKeywords.slice(0, 30).join(', '); // 기존 키워드 상위 30개만 참고
+
+    const res = await fetch(
+      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `너는 키워드 중복 제거 전문가야.
+
+아래 "신규 키워드" 목록에서 서로 같은 이슈/인물/이벤트를 가리키는 중복 키워드를 제거하고,
+또한 "기존 키워드"와 같은 이슈를 가리키는 신규 키워드도 제거해줘.
+
+중복 판단 기준:
+- 같은 인물/그룹의 다른 표현 (예: BTS = 방탄소년단)
+- 같은 이벤트의 다른 표현 (예: "BTS 광화문 콘서트" = "방탄소년단 광화문 공연" = "BTS 컴백 콘서트")
+- 같은 제품/브랜드의 다른 표현 (예: "삼성전자 배당금" = "삼성전자 특별배당금")
+- 중복 중 가장 구체적이고 검색량이 많을 것 같은 키워드 1개만 남길 것
+
+반드시 JSON 배열로만: ["남길키워드1", "남길키워드2", ...]
+제거 없이 다 남기는 것도 가능. 다른 설명 없이 JSON만.`,
+            },
+            {
+              role: 'user',
+              content: `기존 키워드: ${existList}\n\n신규 키워드:\n${newList}`,
+            },
+          ],
+          maxCompletionTokens: 800,
+          temperature: 0.1,
+          repetitionPenalty: 1.0,
+          thinking: { effort: 'none' },
+        }),
+      }
+    );
+    const data = await res.json();
+    const text = data.result?.message?.content || '[]';
+    const result = JSON.parse(text.replace(/```json|```/g, '').trim());
+    if (!Array.isArray(result)) return newKeywords;
+    console.log(`[deduplicateByMeaning] ${newKeywords.length}개 → ${result.length}개 (${newKeywords.length - result.length}개 중복 제거)`);
+    return result.filter(k => typeof k === 'string');
+  } catch (e) {
+    console.log('[deduplicateByMeaning] 실패, 원본 유지:', e.message);
+    return newKeywords;
+  }
+}
+
+// ─────────────────────────────────────────
 // Step 3: 키워드 풀 누적 (이전 TOP20 고정 + 신규 추가)
 // ─────────────────────────────────────────
 async function updateKeywordPool(newKeywords) {
@@ -277,8 +336,15 @@ async function updateKeywordPool(newKeywords) {
     ...pool.map(item => norm(item.keyword)),
     ...top20Norms,
   ]);
-  const newEntries = newKeywords
-    .filter(kw => !existingNorms.has(norm(kw)))
+  const candidates = newKeywords.filter(kw => !existingNorms.has(norm(kw)));
+
+  // AI 기반 의미 중복 제거 — 같은 이슈/인물/브랜드 키워드 1개만 남김
+  const deduplicatedCandidates = await deduplicateByMeaning(candidates, [
+    ...top20Fixed,
+    ...pool.map(p => p.keyword),
+  ]);
+
+  const newEntries = deduplicatedCandidates
     .slice(0, 20)
     .map(kw => ({ keyword: kw, addedAt: today }));
 
@@ -595,6 +661,7 @@ function daysDiff(dateStr) {
 // ─────────────────────────────────────────
 module.exports = async (req, res) => {
   try {
+    const today = getDateString(0);
     const { titles: allTitles, risingWords } = await collectBlogTitles();
     if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
@@ -637,8 +704,6 @@ module.exports = async (req, res) => {
     // null 제외하고 medianPost 계산
     const postValues = dedupedPool.map(kw => poolPostMap[kw]).filter(v => v != null);
     const medianPost = postValues.length ? median(postValues) : 0;
-    const postCountMap = poolPostMap;
-    const maxPost = Math.max(...postValues, 1);
     const maxRate = Math.max(...rawTrends.map(t => t.weeklyRate), 1);
 
     const addedAtMap = Object.fromEntries(
@@ -690,8 +755,10 @@ module.exports = async (req, res) => {
 
     console.log('[blogSurge] 급등 키워드:', Object.keys(postHistoryMap));
 
+    const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
+
     const ranked = rawTrends.map(t => {
-      const postCount = postCountMap[t.keyword] ?? null;
+      const postCount = poolPostMap[t.keyword] ?? null;
       const addedDate = addedAtMap[t.keyword] || today;
       const daysInPool = daysDiff(addedDate);
       const newBonus = daysInPool <= 3 ? 0.15 : 0;
@@ -699,7 +766,6 @@ module.exports = async (req, res) => {
       const blogSurgeRate = surge?.blogSurgeRate || 0;
       const blogSurgeBonus = blogSurgeRate >= 20 ? 0.15 : blogSurgeRate >= 10 ? 0.08 : 0;
 
-      const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
       const risingScore = t.risingRate > 0 ? (t.risingRate / maxRising) * 0.3 : 0;
       const score = (t.weeklyRate / maxRate) * 0.50
         + risingScore
@@ -721,9 +787,8 @@ module.exports = async (req, res) => {
     })
     .sort((a, b) => b.score - a.score);
 
-    // 최종 랭킹 (DataLab 조회 후 추가 중복 없으므로 그대로 사용)
-    const deduped = ranked;
-    const finalRanked = deduped.sort((a, b) => b.score - a.score).slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
+    // 최종 랭킹
+    const finalRanked = ranked.sort((a, b) => b.score - a.score).slice(0, 20).map((k, i) => ({ ...k, rank: i + 1 }));
 
     const risingRanked = [...finalRanked]
       .filter(k => k.risingRate > 0)
@@ -751,10 +816,21 @@ module.exports = async (req, res) => {
     const commentsRaw = await generateComments(finalRanked.slice(0, 10), allTitles);
     const comments = finalRanked.slice(0, 10).map((_, i) => commentsRaw[String(i)] || '');
 
+    // 이전 랭킹 읽어서 prevRank 계산
+    let prevRankMap = {};
+    try {
+      const prevRaw = await redis.get('trend_data');
+      if (prevRaw) {
+        const prevData = typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw;
+        prevRankMap = Object.fromEntries((prevData.keywords || []).map(k => [k.keyword, k.rank]));
+      }
+    } catch(e) {}
+
     const result = {
       updatedAt: new Date().toISOString(),
       keywords: finalRanked.map((k, i) => ({
         rank: i + 1,
+        prevRank: prevRankMap[k.keyword] || null,
         keyword: k.keyword,
         score: Math.round(k.score * 100),
         changeRate: Math.round(k.changeRate),
@@ -767,6 +843,7 @@ module.exports = async (req, res) => {
         isNew: k.isNew,
         comment: comments[i] || '',
         values: k.values.slice(-28),
+        scoreValues: [Math.round(k.score * 100)], // 오늘 score 저장, score_history 누적 후 rank.js에서 확장
       })),
       rising: risingRanked.map((k, i) => ({
         rank: i + 1,
@@ -826,7 +903,7 @@ module.exports = async (req, res) => {
           keyword: k.keyword,
           changeRate: Math.round(k.changeRate),
           risingRate: Math.round(k.risingRate),
-          score: Math.round(k.score * 100),
+          score: k.score,
           rank: k.rank,
           blogSurge: k.blogSurge || false,
         })),
@@ -848,12 +925,12 @@ module.exports = async (req, res) => {
         const stored = await redis.get(scoreKey);
         if (stored) scoreHist = typeof stored === 'string' ? JSON.parse(stored) : stored;
         scoreHist = scoreHist.filter(h => h.date !== dateStrKST);
-        scoreHist.push({ date: dateStrKST, score: Math.round(k.score * 100) });
+        scoreHist.push({ date: dateStrKST, score: k.score }); // 이미 Math.round(원점수*100)
         scoreHist.sort((a, b) => a.date.localeCompare(b.date));
         scoreHist = scoreHist.slice(-30); // 최대 30일치
         await redis.set(scoreKey, JSON.stringify(scoreHist));
       }));
-      console.log('[score_history] 저장 완료:', finalRanked.slice(0, 3).map(k => `${k.keyword}(${Math.round(k.score*100)})`));
+      console.log('[score_history] 저장 완료:', finalRanked.slice(0, 3).map(k => `${k.keyword}(${k.score})`));
     } catch(e) {
       console.log('[score_history] 저장 실패:', e.message);
     }

@@ -10,24 +10,6 @@ const redis = new Redis({
 // ─────────────────────────────────────────
 const avg = arr => arr.length ? arr.reduce((a, b) => a + b, 0) / arr.length : 0;
 
-function median(arr) {
-  if (!arr.length) return 0;
-  const sorted = [...arr].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
-}
-
-function normKw(kw) {
-  if (typeof kw !== 'string') return '';
-  return kw.replace(/(레시피|추천|후기|방법|효능|사용법|만들기|하는법)/g, '').replace(/\s+/g, '').trim();
-}
-
-function daysDiff(dateStr) {
-  const d = new Date(dateStr);
-  const now = new Date();
-  return Math.floor((now - d) / (1000 * 60 * 60 * 24));
-}
-
 function percentile(sortedArr, p) {
   const idx = Math.floor((p / 100) * sortedArr.length);
   return sortedArr[Math.min(idx, sortedArr.length - 1)];
@@ -194,9 +176,6 @@ module.exports = async (req, res) => {
       blogData.sort((a,b) => b.blogGrowth - a.blogGrowth).slice(0,3).map(b => `${b.keyword}(${b.blogGrowth}%)`)
     );
 
-    // 기존 DataLab values 복원
-    const trendMap = Object.fromEntries(prevKeywords.map(k => [k.keyword, k]));
-
     // Step 2: 점수 재계산 (EMA 포함)
     const rawTrends = prevKeywords.map(k => ({
       keyword: k.keyword,
@@ -219,25 +198,22 @@ module.exports = async (req, res) => {
 
     // Step 4: EMA 적용 + 점수 계산
     const scored = await Promise.all(trendsWithEarly.map(async (t) => {
-      const prevK = trendMap[t.keyword];
-      const daysInPool = prevK?.isNew ? 3 : 10; // 간소화 (실제 pool 없으므로)
-      const newBonus = prevK?.isNew ? 0.05 : 0;
+      const isNewKw = prevKeywords.find(p => p.keyword === t.keyword)?.isNew || false;
+      const newBonus = isNewKw ? 0.05 : 0;
 
       // 정규화
       const normWeekly = Math.min(Math.max(t.weeklyRate, 0) / maxWeekly, 1);
       const normRising = Math.min(Math.max(t.risingRate, 0) / maxRising, 1);
       const normBlog = Math.min(Math.max(t.blogGrowth, 0) / maxBlog, 1);
 
-      // 점수: weeklyRate 35% + risingRate 25% + blogGrowth 30% + newBonus 10%
-      // blogGrowth 비중 상향: 실시간 하락 감지 강화
-      const rawScore = normWeekly * 0.35 + normRising * 0.25 + normBlog * 0.30 + newBonus;
+      // 점수: weeklyRate 50% + risingRate 30% + blogGrowth 10% + newBonus (refresh.js와 통일)
+      const rawScore = normWeekly * 0.50 + normRising * 0.30 + normBlog * 0.10 + newBonus;
 
       // EMA 스무딩 적용 (메인 랭킹용)
       const emaScore = await applyEMA(t.keyword, rawScore);
 
       return {
         ...t,
-        rawScore,
         emaScore,
         trend: classifyTrend(t.weeklyRate, t.risingRate, t.blogGrowth),
       };
@@ -245,7 +221,6 @@ module.exports = async (req, res) => {
 
     // EMA 점수 기준 정렬
     const finalRanked = scored
-      .filter(t => avg(t.values.slice(-7)) >= 1.0) // 검색량 최소 기준
       .sort((a, b) => b.emaScore - a.emaScore)
       .slice(0, 20)
       .map((k, i) => ({ ...k, rank: i + 1 }));
@@ -331,27 +306,6 @@ module.exports = async (req, res) => {
     };
 
     await redis.set('trend_data', JSON.stringify(result));
-
-    // 히스토리 누적 (최근 72회 = 3일치 매시간)
-    let history = [];
-    try {
-      const raw = await redis.get('trend_history');
-      if (raw) history = typeof raw === 'string' ? JSON.parse(raw) : raw;
-    } catch(e) {}
-
-    history.push({
-      timestamp: rankUpdatedAt,
-      type: 'rank',
-      keywords: finalRanked.slice(0, 10).map(k => ({
-        keyword: k.keyword,
-        rank: k.rank,
-        changeRate: Math.round(k.weeklyRate),
-        risingRate: Math.round(k.risingRate),
-        blogGrowth: k.blogGrowth,
-      })),
-    });
-    if (history.length > 72) history = history.slice(-72);
-    await redis.set('trend_history', JSON.stringify(history));
 
     res.status(200).json({
       success: true,
