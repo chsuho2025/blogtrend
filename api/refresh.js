@@ -331,6 +331,68 @@ async function deduplicateByMeaning(newKeywords, existingKeywords) {
 }
 
 // ─────────────────────────────────────────
+// Step 3-2: pool 전체 의미 중복 정리
+// ─────────────────────────────────────────
+async function cleanPoolDuplicates(pool) {
+  // pool 전체 키워드 중 의미 중복 제거 (앵커 포함)
+  // 호출 비용 절감을 위해 40개 이하일 때만 실행
+  const keywords = pool.map(p => p.keyword);
+  if (keywords.length === 0) return pool;
+  try {
+    const res = await fetch(
+      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `아래 키워드 목록에서 같은 이슈/인물/이벤트를 가리키는 중복 키워드를 찾아줘.
+
+중복 그룹을 찾아서 각 그룹에서 가장 구체적이고 검색량이 많을 것 같은 대표 키워드 1개만 남기고,
+나머지는 제거한 목록을 반환해줘.
+
+예시:
+- "BTS 광화문 콘서트", "방탄소년단 광화문 공연", "BTS 컴백 콘서트" → "BTS 광화문 콘서트" 1개만
+- "삼성전자 배당금", "삼성전자 특별배당금" → "삼성전자 특별배당금" 1개만
+- "아카데미 시상식", "아카데미상" → "아카데미 시상식" 1개만
+
+반드시 JSON 배열로만: ["키워드1", "키워드2", ...]
+다른 설명 없이 JSON만.`,
+            },
+            {
+              role: 'user',
+              content: keywords.join('\n'),
+            },
+          ],
+          maxCompletionTokens: 600,
+          temperature: 0.1,
+          repetitionPenalty: 1.0,
+          thinking: { effort: 'none' },
+        }),
+      }
+    );
+    const data = await res.json();
+    const text = data.result?.message?.content || '[]';
+    const cleaned = JSON.parse(text.replace(/```json|```/g, '').trim());
+    if (!Array.isArray(cleaned) || cleaned.length === 0) return pool;
+
+    const cleanedSet = new Set(cleaned.map(k => k.trim()));
+    const result = pool.filter(p => cleanedSet.has(p.keyword));
+    console.log(`[cleanPoolDuplicates] ${pool.length}개 → ${result.length}개 (${pool.length - result.length}개 중복 정리)`);
+    return result;
+  } catch (e) {
+    console.log('[cleanPoolDuplicates] 실패, 원본 유지:', e.message);
+    return pool;
+  }
+}
+
+// ─────────────────────────────────────────
 // Step 3: 키워드 풀 누적 (이전 TOP20 고정 + 신규 추가)
 // ─────────────────────────────────────────
 async function updateKeywordPool(newKeywords) {
@@ -375,7 +437,8 @@ async function updateKeywordPool(newKeywords) {
   ]);
   const candidates = newKeywords.filter(kw => !existingNorms.has(norm(kw)));
 
-  // AI 기반 의미 중복 제거 — 같은 이슈/인물/브랜드 키워드 1개만 남김
+  // AI 기반 의미 중복 제거 — 앵커 목록도 함께 전달해서 앵커와 신규 간 중복도 제거
+  // (앵커끼리 중복은 top20_pool 저장 단계에서 이미 처리됨)
   const deduplicatedCandidates = await deduplicateByMeaning(candidates, [
     ...top20Fixed,
     ...pool.map(p => p.keyword),
@@ -407,7 +470,7 @@ async function updateKeywordPool(newKeywords) {
     '다이어트', '홈트레이닝', '맛집', '후기', '추천',
   ]);
 
-  const cleanMerged = [...top20Anchors, ...newEntries, ...poolFiltered]
+  const preCleaned = [...top20Anchors, ...newEntries, ...poolFiltered]
     .filter(item => {
       const kw = item.keyword;
       if (POOL_STOP_SINGLES.has(kw)) return false;
@@ -415,6 +478,9 @@ async function updateKeywordPool(newKeywords) {
       return true;
     })
     .slice(0, 100);
+
+  // pool 전체 의미 중복 정리 (앵커 포함)
+  const cleanMerged = await cleanPoolDuplicates(preCleaned);
 
   await redis.set('keyword_pool', JSON.stringify(cleanMerged));
   console.log(`[updateKeywordPool] pool 크기: ${cleanMerged.length} (앵커: ${top20Anchors.length}개, 신규: ${newEntries.length}개)`);
@@ -849,9 +915,9 @@ module.exports = async (req, res) => {
       k.category = categories[i] || '';
     });
 
-    // 코멘트 생성 (관련 블로그 제목 포함)
-    const commentsRaw = await generateComments(finalRanked.slice(0, 10), allTitles);
-    const comments = finalRanked.slice(0, 10).map((_, i) => commentsRaw[String(i)] || '');
+    // 코멘트 생성 (관련 블로그 제목 포함) — 20위까지 전체 생성
+    const commentsRaw = await generateComments(finalRanked.slice(0, 20), allTitles);
+    const comments = finalRanked.slice(0, 20).map((_, i) => commentsRaw[String(i)] || '');
 
     // 이전 랭킹 읽어서 prevRank 계산
     let prevRankMap = {};
@@ -922,8 +988,10 @@ module.exports = async (req, res) => {
         if (kw.replace(/\s/g, '').length <= 2) return false;
         return true;
       });
-    await redis.set('top20_pool', JSON.stringify(top20Keywords));
-    console.log('[top20_pool] 저장:', top20Keywords.slice(0, 5));
+    // top20_pool 저장 전 AI 의미 중복 제거 (앵커끼리 BTS/방탄소년단 등 통합)
+    const top20Deduped = await deduplicateByMeaning(top20Keywords, []);
+    await redis.set('top20_pool', JSON.stringify(top20Deduped));
+    console.log('[top20_pool] 저장:', top20Deduped.slice(0, 5), `(중복제거: ${top20Keywords.length}→${top20Deduped.length}개)`);
 
     // 히스토리 저장 - 0시 1회 cron이므로 항상 저장, 최대 30일치
     const nowKST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
