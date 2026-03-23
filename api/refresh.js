@@ -6,21 +6,84 @@ const redis = new Redis({
 });
 
 // ─────────────────────────────────────────
-// 그물 키워드
+// Step 0-1: 그물 키워드 자동 갱신 (매일)
 // ─────────────────────────────────────────
-const NET_KEYWORDS = [
+const NET_KEYWORDS_BASE = [
   '신상', '요즘', '핫한', '뜨는', '화제', '인기', '난리', '대세',
   '후기', '추천', '꿀팁', '레시피', '챌린지', '리뷰', '사용기', '솔직후기',
   '득템', '하울', '언박싱', '추천템',
-  '봄신상', '한정판', '화이트데이', '봄',
-  '갓생', '무지출', '루틴', '홈카페', '홈트', '자취',
-  '짠테크', '앱테크',
 ];
+
+async function loadNetKeywords() {
+  try {
+    const stored = await redis.get('net_keywords_dynamic');
+    if (stored) {
+      const dynamic = typeof stored === 'string' ? JSON.parse(stored) : stored;
+      if (Array.isArray(dynamic) && dynamic.length >= 5) {
+        console.log('[netKeywords] 동적 키워드 로드:', dynamic.slice(0, 5));
+        return [...NET_KEYWORDS_BASE, ...dynamic];
+      }
+    }
+  } catch(e) {}
+  return NET_KEYWORDS_BASE;
+}
+
+async function updateNetKeywords(risingWords) {
+  if (!risingWords || risingWords.length < 5) return;
+  try {
+    const res = await fetch(
+      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `너는 네이버 블로그 트렌드 수집 전문가야.
+아래는 오늘 네이버 블로그에서 급상승한 단어들이야.
+이 단어들을 참고해서 내일 네이버 블로그에서 트렌드 콘텐츠를 많이 포함할 것 같은 검색 키워드 10개를 추천해줘.
+
+조건:
+- 블로그 검색 시 다양한 트렌드 콘텐츠가 나올 수 있는 일반적인 키워드
+- 너무 구체적인 제품명 말고 카테고리 수준 (예: "봄신상", "신메뉴", "핫플")
+- 오늘 급상승 단어와 연관된 카테고리 반영
+- 중복 없이 10개
+
+반드시 JSON 배열로만: ["키워드1","키워드2",...]
+다른 설명 없이 JSON만.`,
+            },
+            {
+              role: 'user',
+              content: `오늘 급상승 단어: ${risingWords.slice(0, 20).join(', ')}`,
+            },
+          ],
+          maxCompletionTokens: 300,
+          temperature: 0.4,
+          thinking: { effort: 'none' },
+        }),
+      }
+    );
+    const data = await res.json();
+    const text = data.result?.message?.content || '[]';
+    const keywords = JSON.parse(text.replace(/```json|```/g, '').trim());
+    if (Array.isArray(keywords) && keywords.length >= 5) {
+      await redis.set('net_keywords_dynamic', JSON.stringify(keywords));
+      console.log('[netKeywords] 동적 갱신 완료:', keywords);
+    }
+  } catch(e) {
+    console.log('[netKeywords] 갱신 실패:', e.message);
+  }
+}
 
 // ─────────────────────────────────────────
 // Step 1: 그물 키워드로 블로그 제목 수집
 // ─────────────────────────────────────────
-async function collectBlogTitles() {
+async function collectBlogTitles(netKeywords) {
   const seenTitles = new Set();
   const allTitles = [];
   const NOISE_PATTERNS = [
@@ -37,7 +100,7 @@ async function collectBlogTitles() {
   const seenRecent = new Set();
   const seenOlder = new Set();
 
-  for (const keyword of NET_KEYWORDS) {
+  for (const keyword of netKeywords) {
     await sleep(100);
     try {
       const url = `https://openapi.naver.com/v1/search/blog?query=${encodeURIComponent(keyword)}&display=100&start=1&sort=date`;
@@ -191,6 +254,10 @@ async function extractTrendKeywords(titles, risingWords = []) {
 - 지역 상호명/맛집명 (나쁨: "선릉 버터떡 맛집", "성수 오밀파스타")
 - 모델번호/시리얼번호
 - 날짜/채용/일정 정보
+- 앱 퀴즈/이벤트 정답 (예: 신한 쏠퀴즈, 카카오뱅크 AI퀴즈, 캐시워크 3월23일 정답)
+- 쇼핑몰 적립금/쿠폰 이벤트 (예: CJ온스타일 적립금, 카카오페이 쿠폰받기, 롯데하이마트 창립기념)
+- 정부 보조금/지원금 정보 (예: 청년 일자리 도약 장려금, 청년 월세 지원, 국민취업지원제도)
+- 재테크/주식/코인 정보 (예: 공모주 청약, 코스피 폭락, 비트코인 시세)
 - 블로그 제목 그대로 복사${risingContext}
 
 반드시 JSON 배열로만, 15개 이하: ["키워드1","키워드2",...]
@@ -232,18 +299,16 @@ async function extractTrendKeywords(titles, risingWords = []) {
     /추천하는/, /솔직한/, /나만의/, /이야기/, /가능한/, /특별한/,
     /태교여행/, /육아박스/, /이유식/, /임신초기/,
     /나솔/, /현역가왕/, /핫딜/, /공매도/, /파산/, /챌린지$/,
+    // 바이럴 마케팅/이벤트성 키워드
+    /퀴즈/, /정답/, /OX퀴즈/, /적립금/, /쿠폰받기/, /무료나눔/, /선착순/,
+    /지원금/, /장려금/, /보조금/, /바우처/, /페이래플/, /앱테크/, /리워드/,
+    /공모주/, /청약/, /배당금/, /주가/, /코스피/, /코스닥/, /비트코인/,
   ];
-  // 범용 단일어 코드 레벨 차단 목록
+  // 최소 코드 필터: 공백 제거 후 3자 이하 단일어만 차단
+  // (나머지 범용어는 autoBlacklist + AI 게이팅에 위임)
   const SINGLE_STOP = new Set([
-    '나이키', '아디다스', '이마트', '쿠팡', '다이소', '올리브영', '스타벅스',
-    '맥도날드', '배달의민족', '카카오', '네이버', '삼성', '애플', '구글',
-    '레시피', '피부', '가디건', '강아지', '고양이', '루틴', '갓생', '무지출',
-    '웨이팅', '해결', '추천', '후기', '리뷰', '꿀팁', '하울', '언박싱',
-    '다이어트', '홈트', '자취', '봄', '여름', '가을', '겨울', '신상',
-    // 추가: 생활 범용어
-    '가계부', '만원', '쇼핑', '서울', '중고폰', '필수', '웨이트', '데이트',
-    '직장인', '자취생', '일상', '일기', '하루', '오늘', '주말', '월급',
-    '절약', '짠테크', '앱테크', '가성비', '후기글', '정보', '꿀정보',
+    '봄', '여름', '가을', '겨울', '신상', '후기', '추천', '리뷰', '꿀팁',
+    '피부', '일상', '하루', '오늘', '서울', '만원', '쇼핑',
   ]);
 
   const filtered = allKeywords.filter(kw => {
@@ -263,6 +328,64 @@ async function extractTrendKeywords(titles, risingWords = []) {
 
   console.log(`[extractTrendKeywords] 전체 ${allKeywords.length}개 추출 → 필터후 ${filtered.length}개`);
   return filtered;
+}
+
+
+// ─────────────────────────────────────────
+// Step 자가학습: DataLab 0.00 자동 블랙리스트
+// ─────────────────────────────────────────
+async function updateAutoBlacklist(rawTrends) {
+  try {
+    const zeroKws = rawTrends
+      .filter(t => {
+        const avg7 = t.values.slice(-7).reduce((a, b) => a + b, 0) / 7;
+        return avg7 < 0.1; // 7일 평균 0.1 미만 = 사실상 0
+      })
+      .map(t => t.keyword);
+
+    if (zeroKws.length === 0) return;
+
+    let blacklist = [];
+    try {
+      const stored = await redis.get('auto_blacklist');
+      if (stored) blacklist = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    } catch(e) {}
+
+    const today = new Date().toISOString().slice(0, 10);
+    const expiryCutoff = new Date();
+    expiryCutoff.setDate(expiryCutoff.getDate() - 30);
+    const expiryStr = expiryCutoff.toISOString().slice(0, 10);
+
+    // 30일 지난 항목 제거
+    blacklist = blacklist.filter(b => b.date >= expiryStr);
+
+    // 새 0.00 키워드 추가 (중복 제외)
+    const existingKws = new Set(blacklist.map(b => b.keyword));
+    const newEntries = zeroKws
+      .filter(kw => !existingKws.has(kw))
+      .map(kw => ({ keyword: kw, date: today }));
+
+    blacklist.push(...newEntries);
+    await redis.set('auto_blacklist', JSON.stringify(blacklist));
+
+    if (newEntries.length > 0) {
+      console.log('[autoBlacklist] 추가:', newEntries.map(b => b.keyword));
+    }
+    console.log('[autoBlacklist] 현재 블랙리스트:', blacklist.length, '개');
+  } catch(e) {
+    console.log('[autoBlacklist] 업데이트 실패:', e.message);
+  }
+}
+
+async function loadAutoBlacklist() {
+  try {
+    const stored = await redis.get('auto_blacklist');
+    if (!stored) return new Set();
+    const blacklist = typeof stored === 'string' ? JSON.parse(stored) : stored;
+    return new Set(blacklist.map(b => b.keyword));
+  } catch(e) {
+    return new Set();
+  }
 }
 
 // ─────────────────────────────────────────
@@ -298,6 +421,10 @@ async function deduplicateByMeaning(newKeywords, existingKeywords) {
 - 연예인/방송인 이름 단독 (예: "풍자", "카리나", "이준호")
 - 다이어트/체중 인물 서사 (예: "풍자 28kg 감량", "김현숙 다이어트")
 - 방송 프로그램/회차 (예: "나솔사계", "미우새", "편스토랑")
+- 앱 퀴즈/이벤트 정답 (예: "신한 쏠퀴즈", "카카오뱅크 AI퀴즈", "캐시워크 정답")
+- 쇼핑몰 적립금/쿠폰 이벤트 (예: "CJ온스타일 적립금", "카카오페이 쿠폰받기")
+- 정부 보조금/지원금 (예: "청년 일자리 도약 장려금", "청년 월세 지원")
+- 재테크/주식/코인 정보 (예: "공모주 청약", "코스피 폭락", "비트코인 시세")
 - 네이버에서 실제로 검색할 것 같지 않은 키워드
 
 [2단계: 의미 중복 제거]
@@ -450,7 +577,15 @@ async function updateKeywordPool(newKeywords) {
     ...pool.map(item => norm(item.keyword)),
     ...top20Norms,
   ]);
-  const candidates = newKeywords.filter(kw => !existingNorms.has(norm(kw)));
+  // 자동 블랙리스트 로드 (DataLab 0.00 자동 학습)
+  const autoBlacklist = await loadAutoBlacklist();
+  const candidates = newKeywords.filter(kw =>
+    !existingNorms.has(norm(kw)) && !autoBlacklist.has(kw)
+  );
+  if (autoBlacklist.size > 0) {
+    const blocked = newKeywords.filter(kw => autoBlacklist.has(kw));
+    if (blocked.length > 0) console.log('[autoBlacklist] 차단:', blocked);
+  }
 
   // AI 기반 의미 중복 제거 — 앵커 목록도 함께 전달해서 앵커와 신규 간 중복도 제거
   // (앵커끼리 중복은 top20_pool 저장 단계에서 이미 처리됨)
@@ -474,22 +609,17 @@ async function updateKeywordPool(newKeywords) {
   console.log(`[updateKeywordPool] 14일 초과 제거: ${pool.length}개 → ${poolFiltered.length}개`);
 
   // 구성: [이전 TOP20 앵커] + [신규 20개] + [기존 pool 잔여]
-  // pool 저장 전 연예인/인물/단어 필터링
-  const POOL_NOISE = [
-    /변호사/, /법률/, /소송/, /성범죄/, /추행/, /그루밍/, /중절/, /로펌/,
-    /나솔/, /현역가왕/, /태교여행/, /핫딜/, /공매도/,
+  // 법적 민감 패턴만 코드 레벨 유지 (나머지는 AI 게이팅 위임)
+  const LEGAL_NOISE = [
+    /성범죄/, /추행/, /그루밍/, /성폭/, /성추행/, /강간/, /음란/, /도촬/, /중절/,
+    /변호사/, /법률/, /법인/, /소송/, /로펌/,
   ];
-  const POOL_STOP_SINGLES = new Set([
-    '화이트', '가지', '스마트', '분위기', '직장인', '드라마', '우리', '비교',
-    '에어', '한정판', '실사용', '언박싱', '필라테스', '가습기', '두쫀쿠',
-    '다이어트', '홈트레이닝', '맛집', '후기', '추천',
-  ]);
 
   const preCleaned = [...top20Anchors, ...newEntries, ...poolFiltered]
     .filter(item => {
       const kw = item.keyword;
-      if (POOL_STOP_SINGLES.has(kw)) return false;
-      if (POOL_NOISE.some(p => p.test(kw))) return false;
+      if (LEGAL_NOISE.some(p => p.test(kw))) return false;
+      if (kw.replace(/\s/g, '').length <= 1) return false;
       return true;
     })
     .slice(0, 100);
@@ -790,7 +920,8 @@ function daysDiff(dateStr) {
 module.exports = async (req, res) => {
   try {
     const today = getDateString(0);
-    const { titles: allTitles, risingWords } = await collectBlogTitles();
+    const netKeywords = await loadNetKeywords();
+    const { titles: allTitles, risingWords } = await collectBlogTitles(netKeywords);
     if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
     const refined = await extractTrendKeywords(allTitles, risingWords);
@@ -832,6 +963,9 @@ module.exports = async (req, res) => {
 
     const rawTrends = await getSearchTrends(dedupedPool);
     if (!rawTrends.length) throw new Error('트렌드 조회 실패');
+
+    // 자가학습: DataLab 0.00 키워드 자동 블랙리스트 업데이트
+    await updateAutoBlacklist(rawTrends);
 
     // null 제외하고 medianPost 계산
     const postValues = dedupedPool.map(kw => poolPostMap[kw]).filter(v => v != null);
@@ -1008,15 +1142,11 @@ module.exports = async (req, res) => {
 
     // 이전 TOP20 키워드 목록 저장 (다음 리프레시에서 pool 앵커로 사용)
     // 연예인/인물/노이즈 필터링 후 저장
-    const TOP20_NOISE = [
-      /변호사/, /법률/, /소송/, /성범죄/, /추행/, /그루밍/, /중절/, /로펌/,
-      /나솔/, /현역가왕/, /태교여행/, /핫딜/, /공매도/,
+    // 법적 민감 패턴만 유지 (나머지는 AI 게이팅 위임)
+    const LEGAL_NOISE_TOP20 = [
+      /성범죄/, /추행/, /그루밍/, /성폭/, /성추행/, /강간/, /음란/, /도촬/, /중절/,
+      /변호사/, /법률/, /법인/, /소송/, /로펌/,
     ];
-    const TOP20_STOP = new Set([
-      '화이트', '가지', '스마트', '분위기', '직장인', '드라마', '우리', '비교',
-      '에어', '한정판', '실사용', '언박싱', '필라테스', '가습기',
-      '다이어트', '홈트레이닝', '맛집', '후기', '추천', '버터떡',
-    ]);
     const top20Keywords = finalRanked
       .filter(k => {
         // 하락세 키워드 앵커 제외 (risingRate < -20 AND weeklyRate < -10)
@@ -1028,8 +1158,7 @@ module.exports = async (req, res) => {
       })
       .map(k => k.keyword)
       .filter(kw => {
-        if (TOP20_STOP.has(kw)) return false;
-        if (TOP20_NOISE.some(p => p.test(kw))) return false;
+        if (LEGAL_NOISE_TOP20.some(p => p.test(kw))) return false;
         if (kw.replace(/\s/g, '').length <= 2) return false;
         return true;
       });
@@ -1084,6 +1213,9 @@ module.exports = async (req, res) => {
     } catch(e) {
       console.log('[score_history] 저장 실패:', e.message);
     }
+    // 자가학습: 내일 그물 키워드 자동 갱신
+    await updateNetKeywords(risingWords);
+
     res.status(200).json({
       success: true,
       updatedAt: result.updatedAt,
