@@ -721,11 +721,6 @@ function fmtHistLabel(iso, date) {
 
 // ── 다음 업데이트 표시 (하루 1회 0시 갱신) ──
 function scheduleAutoRefresh() {
-  const now = new Date();
-  const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  const tomorrow = new Date(kstNow);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  tomorrow.setHours(0, 0, 0, 0);
   document.getElementById('nextUpdate').textContent = '· 매일 00:00 업데이트';
 }
 
@@ -785,7 +780,6 @@ async function manualRefresh() {
 function renderAll(data) {
   globalData = data;
   globalKws = data.keywords || [];
-  const rising = data.rising || [];
 
   // Header
   const rankTime = data.rankUpdatedAt || data.updatedAt;
@@ -867,8 +861,6 @@ function buildMainContent() {
 function buildRankRows(kws) {
   const filtered = activeCat === 'all' ? kws : kws.filter(k => k.category === activeCat);
   if (!filtered.length) return `<div style="padding:40px;text-align:center;color:var(--gray-3);font-size:13px;">해당 카테고리 데이터가 없어요</div>`;
-
-  const rows = '';
 
   function buildRow(kw, i) {
     const numCls = kw.rank===1?'top1':kw.rank===2?'top2':kw.rank===3?'top3':'';
@@ -1057,47 +1049,6 @@ function closeKwDetail(e) {
   document.getElementById('kwDetailModal').classList.remove('show');
   document.body.style.overflow = '';
   if (kwDetailChartInstance) { kwDetailChartInstance.destroy(); kwDetailChartInstance = null; }
-}
-
-// ── 게시글 모달 ──
-async function openPostsModal(keyword, e) {
-  if (e) e.stopPropagation();
-  const modal = document.getElementById('postsModal');
-  const body = document.getElementById('modalBody');
-  const title = document.getElementById('modalTitle');
-  const sub = document.getElementById('modalSub');
-
-  title.textContent = keyword;
-  sub.textContent = '네이버 블로그 최신 게시글';
-  body.innerHTML = '<div class="modal-loading"><div class="loading-ring"></div><div class="state-text">게시글 불러오는 중...</div></div>';
-  modal.classList.add('show');
-  document.body.style.overflow = 'hidden';
-
-  try {
-    const res = await fetch('/api/posts?keyword=' + encodeURIComponent(keyword) + '&display=20');
-    const data = await res.json();
-    const posts = data.posts || [];
-
-    if (posts.length === 0) {
-      body.innerHTML = '<div class="modal-empty">관련 게시글이 없습니다.</div>';
-      return;
-    }
-
-    sub.textContent = '최근 게시글 ' + posts.length + '개';
-    body.innerHTML = posts.map(function(p) {
-      const date = p.postdate
-        ? p.postdate.slice(0,4) + '.' + p.postdate.slice(4,6) + '.' + p.postdate.slice(6,8)
-        : '';
-      const desc = p.description ? '<div class="modal-post-desc">' + p.description + '</div>' : '';
-      return '<a class="modal-post-item" href="' + p.link + '" target="_blank" rel="noopener">'
-        + '<div class="modal-post-title">' + p.title + '</div>'
-        + desc
-        + '<div class="modal-post-meta">' + (p.bloggerName || '') + ' · ' + date + '</div>'
-        + '</a>';
-    }).join('');
-  } catch(err) {
-    body.innerHTML = '<div class="modal-empty">불러오기 실패. 잠시 후 다시 시도해 주세요.</div>';
-  }
 }
 
 function closePostsModal(e) {
