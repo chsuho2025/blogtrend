@@ -450,6 +450,17 @@
       overflow: hidden; max-width: 55%;
     }
 
+    .kw-period-btn {
+      padding: 4px 12px; border-radius: 6px; font-size: 11px; font-weight: 600;
+      cursor: pointer; color: var(--gray-3); background: none; border: none;
+      font-family: 'Pretendard', sans-serif; transition: all .15s;
+    }
+    .kw-period-btn:hover { color: var(--black); }
+    .kw-period-btn.active {
+      background: var(--white); color: var(--black); font-weight: 700;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+
     footer { max-width: 1160px; margin: 0 auto; padding: 16px 24px 36px; display: flex; align-items: center; justify-content: space-between; }
     .footer-left { font-size: 11px; color: var(--gray-4); }
     .footer-tags { display: flex; gap: 5px; }
@@ -536,6 +547,13 @@
       <div id="kwDetailBadges" style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;"></div>
     </div>
     <div class="kw-detail-body">
+      <div style="display:flex;justify-content:flex-end;padding:8px 20px 0;">
+        <div id="kwPeriodTabs" style="display:flex;background:var(--gray-6);border-radius:8px;padding:2px;gap:1px;">
+          <button class="kw-period-btn active" data-days="7" onclick="setKwPeriod(7)">1주</button>
+          <button class="kw-period-btn" data-days="14" onclick="setKwPeriod(14)">2주</button>
+          <button class="kw-period-btn" data-days="28" onclick="setKwPeriod(28)">4주</button>
+        </div>
+      </div>
       <div class="kw-detail-chart-wrap"><canvas id="kwDetailChart"></canvas></div>
       <div class="kw-detail-stats" id="kwDetailStats"></div>
       <div class="kw-detail-posts-section">
@@ -877,6 +895,8 @@ function buildRankRows(kws) {
 
 // ── 키워드 상세 모달 ──
 let kwDetailChartInstance = null;
+let kwDetailCurrentKeyword = null;
+let kwDetailCurrentDays = 7;
 
 function toggleRankMore() {
   const wrap = document.getElementById('rankRestRows');
@@ -895,6 +915,12 @@ function toggleDetail(row, keyword, idx) {
 function openKwDetail(keyword) {
   const kw = globalKws.find(k => k.keyword === keyword);
   if (!kw) return;
+
+  kwDetailCurrentKeyword = keyword;
+  // 기간 탭 초기화
+  document.querySelectorAll('.kw-period-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.days) === kwDetailCurrentDays);
+  });
 
   const modal = document.getElementById('kwDetailModal');
   document.getElementById('kwDetailName').textContent = kw.keyword;
@@ -939,11 +965,14 @@ function openKwDetail(keyword) {
     const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
     if (!ctx) return;
     // values(검색지수): 28일치 즉시 제공, 키워드별 피크 시점 파악에 최적
+    // 자기 자신의 최고치를 100으로 정규화 → 키워드별 독립 트렌드 곡선
     const rawValues = kw.values && kw.values.length > 0 ? kw.values : [];
-    const days = 28;
-    const values = rawValues.length >= days
+    const days = kwDetailCurrentDays;
+    const sliced = rawValues.length >= days
       ? rawValues.slice(-days)
       : [...Array(days - rawValues.length).fill(null), ...rawValues];
+    const maxVal = Math.max(...sliced.filter(v => v != null), 1);
+    const values = sliced.map(v => v != null ? Math.round((v / maxVal) * 100) : null);
     const labels = Array.from({length: days}, (_, i) => {
       const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
       return (d.getMonth()+1) + '/' + d.getDate();
@@ -960,7 +989,7 @@ function openKwDetail(keyword) {
       const sub = document.createElement('div');
       sub.className = 'chart-subtitle';
       sub.style.cssText = 'font-size:10px;color:var(--gray-4);text-align:right;margin-bottom:4px;';
-      sub.textContent = peakLabel ? `검색지수 (28일) · ${peakLabel}` : '검색지수 (28일)';
+      sub.textContent = peakLabel ? `검색지수 (${days}일) · ${peakLabel}` : `검색지수 (${days}일)`;
       chartTitle.insertBefore(sub, chartTitle.firstChild);
     }
     // 게시글 비동기 로드
@@ -1016,11 +1045,76 @@ function openKwDetail(keyword) {
         }},
         scales: {
           x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { color: '#E8E8E8' } },
-          y: { min: 0, max: 100, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, callback: v => v }, border: { color: '#E8E8E8' } }
+          y: { min: 0, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, callback: v => v }, border: { color: '#E8E8E8' } }
         }
       }
     });
   }, 50);
+}
+
+function setKwPeriod(days) {
+  kwDetailCurrentDays = days;
+  document.querySelectorAll('.kw-period-btn').forEach(b => {
+    b.classList.toggle('active', parseInt(b.dataset.days) === days);
+  });
+  // 차트 subtitle 제거 후 재생성
+  document.querySelectorAll('.chart-subtitle').forEach(el => el.remove());
+  if (kwDetailCurrentKeyword) {
+    if (kwDetailChartInstance) { kwDetailChartInstance.destroy(); kwDetailChartInstance = null; }
+    // openKwDetail의 차트 그리기 부분 재실행
+    const kw = globalKws.find(k => k.keyword === kwDetailCurrentKeyword);
+    if (!kw) return;
+    const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
+    if (!ctx) return;
+    const rawValues = kw.values && kw.values.length > 0 ? kw.values : [];
+    const sliced = rawValues.length >= days
+      ? rawValues.slice(-days)
+      : [...Array(days - rawValues.length).fill(null), ...rawValues];
+    const maxVal = Math.max(...sliced.filter(v => v != null), 1);
+    const values = sliced.map(v => v != null ? Math.round((v / maxVal) * 100) : null);
+    const labels = Array.from({length: days}, (_, i) => {
+      const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
+      return (d.getMonth()+1) + '/' + d.getDate();
+    });
+    const peakIdx = values.reduce((best, v, i) => (v != null && (best === -1 || v > values[best])) ? i : best, -1);
+    const peakDaysAgo = peakIdx >= 0 ? days - 1 - peakIdx : -1;
+    const peakLabel = peakDaysAgo === 0 ? '오늘 최고점'
+      : peakDaysAgo === 1 ? '어제 최고점'
+      : peakDaysAgo > 1 ? `${peakDaysAgo}일 전 최고점` : '';
+    const chartTitle = document.querySelector('.kw-detail-chart-wrap');
+    if (chartTitle && !chartTitle.querySelector('.chart-subtitle')) {
+      const sub = document.createElement('div');
+      sub.className = 'chart-subtitle';
+      sub.style.cssText = 'font-size:10px;color:var(--gray-4);text-align:right;margin-bottom:4px;';
+      sub.textContent = peakLabel ? `검색지수 (${days}일) · ${peakLabel}` : `검색지수 (${days}일)`;
+      chartTitle.insertBefore(sub, chartTitle.firstChild);
+    }
+    const nonNull = values.filter(v => v !== null);
+    kwDetailChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets: [{
+        data: values, borderColor: '#2DB400', backgroundColor: 'rgba(45,180,0,0.08)',
+        borderWidth: 2,
+        pointRadius: nonNull.length <= 1 ? 4 : 0,
+        pointHoverRadius: 4, tension: 0.4, fill: true, spanGaps: false,
+      }]},
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        layout: { padding: { top: 12, bottom: 4, right: 8 } },
+        interaction: { mode: 'index', intersect: false },
+        plugins: { legend: { display: false }, tooltip: {
+          backgroundColor: '#fff', borderColor: '#E8E8E8', borderWidth: 1,
+          titleColor: '#111', bodyColor: '#555',
+          titleFont: { family: 'Pretendard', size: 11 },
+          bodyFont: { family: 'Pretendard', size: 11 }, padding: 8,
+        }},
+        scales: {
+          x: { grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 7 }, border: { color: '#E8E8E8' } },
+          y: { min: 0, grid: { color: '#F4F4F4' }, ticks: { color: '#AAA', font: { size: 10, family: 'Pretendard' }, callback: v => v }, border: { color: '#E8E8E8' } }
+        }
+      }
+    });
+  }
 }
 
 function closeKwDetail(e) {
