@@ -278,7 +278,7 @@ async function collectBlogTitles(netKeywords) {
   console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (최근3일: ${filteredRecent.length}개, 이전3일: ${filteredOlder.length}개)`);
   console.log(`[collectBlogTitles] 급상승 단어 TOP10:`, risingWords.slice(0, 10));
 
-  return { titles: filtered, risingWords, mimeCandidates };
+  return { titles: filtered, recentTitles: filteredRecent, risingWords, mimeCandidates };
 }
 
 // ─────────────────────────────────────────
@@ -1067,359 +1067,350 @@ function daysDiff(dateStr) {
 }
 
 // ─────────────────────────────────────────
-// 메인
+// 메인 — 4단계 분리 (Vercel Hobby 10초 타임아웃 대응)
 // ─────────────────────────────────────────
 module.exports = async (req, res) => {
+  const stepParam = req.query?.step || req.body?.step;
+  
+  // step 파라미터 없음 = cron 모드 → 내부에서 1~4 순차 실행
+  if (!stepParam) {
+    console.log('[refresh] cron 모드 시작 — step 1~4 순차 실행');
+    const baseUrl = `https://${req.headers.host}`;
+    let lastResult = {};
+    for (const s of [1, 2, 3, 4]) {
+      console.log(`[refresh] cron step ${s} 호출`);
+      try {
+        const r = await fetch(`${baseUrl}/api/refresh?step=${s}`, {
+          method: 'GET',
+          headers: { 'x-cron-secret': process.env.CRON_SECRET || '' },
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || `step${s} 실패`);
+        lastResult = data;
+        console.log(`[refresh] cron step ${s} 완료:`, data);
+        if (data.done) break;
+      } catch(e) {
+        console.error(`[refresh] cron step ${s} 오류:`, e.message);
+        return res.status(500).json({ error: e.message, failedStep: s });
+      }
+    }
+    return res.status(200).json({ success: true, mode: 'cron', ...lastResult });
+  }
+
+  const step = parseInt(stepParam);
+  console.log(`[refresh] step ${step} 시작`);
+
   try {
     const today = getDateString(0);
-    const netKeywords = await loadNetKeywords();
-    const { titles: allTitles, risingWords, mimeCandidates } = await collectBlogTitles(netKeywords);
 
-    // Step 2-1: 밈/신조어 감지 (형태 무관, HCX 1회)
-    const memeKeywords = await detectMimicPatterns(
-      allTitles.slice(0, 600), // 최근 제목 샘플
-      mimeCandidates
-    );
-    if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
+    // ────────────────────────────────────────
+    // STEP 1: 블로그 수집 + 키워드 추출
+    // HCX: detectMimicPatterns(1) + extractTrendKeywords(4) = 5회
+    // ────────────────────────────────────────
+    if (step === 1) {
+      const netKeywords = await loadNetKeywords();
+      const { titles: allTitles, recentTitles, risingWords, mimeCandidates } = await collectBlogTitles(netKeywords);
+      if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
-    const refined = await extractTrendKeywords(allTitles, risingWords);
-    if (!refined.length) throw new Error('키워드 추출 실패');
+      const memeKeywords = await detectMimicPatterns(recentTitles, mimeCandidates);
+      const refined = await extractTrendKeywords(allTitles, risingWords);
+      if (!refined.length) throw new Error('키워드 추출 실패');
 
-    // 밈 키워드를 pool에 추가 (중복 제외, isMemetic 플래그)
-    const memeOnlyNew = memeKeywords.filter(m =>
-      !refined.includes(m) && m.length >= 2
-    );
-    if (memeOnlyNew.length > 0) {
-      console.log('[detectMimic] pool 추가 대상:', memeOnlyNew);
-    }
-    const refinedWithMeme = [...refined, ...memeOnlyNew];
+      const memeOnlyNew = memeKeywords.filter(m => !refined.includes(m) && m.length >= 2);
+      if (memeOnlyNew.length > 0) console.log('[detectMimic] pool 추가 대상:', memeOnlyNew);
 
-    const keywordPool = await updateKeywordPool(refinedWithMeme);
-    if (!keywordPool.length) throw new Error('키워드 풀 없음');
-
-    // pool 앞 40개 포스팅 수 조회 → 50만 초과 제거 → 중복 제거 → DataLab 조회
-    const poolKeywords = keywordPool.slice(0, 40).map(item => item.keyword);
-    const poolPostCounts = await getBlogPostCount(poolKeywords);
-    const poolPostMap = Object.fromEntries(poolPostCounts.map(p => [p.keyword, p.total]));
-    // DataLab이 키워드를 약간 변형해서 반환할 때를 위한 normKw 기반 fallback 맵
-    const poolPostNormMap = Object.fromEntries(
-      poolPostCounts.map(p => [normKw(p.keyword), p.total])
-    );
-
-    // 50만 초과 제거 (null이면 통과)
-    const filteredPool = poolKeywords.filter(kw => {
-      const cnt = poolPostMap[kw];
-      return cnt === null || cnt === undefined || cnt < 500000;
-    });
-    console.log(`[preFilter] 50만 초과 제거: ${poolKeywords.length}개 → ${filteredPool.length}개`);
-
-    // 중복 제거 (짧은 키워드 우선)
-    const dedupedPool = [];
-    const sortedPool = [...filteredPool].sort((a, b) => normKw(a).length - normKw(b).length);
-    for (const kw of sortedPool) {
-      const n = normKw(kw);
-      if (n.length < 2) { dedupedPool.push(kw); continue; }
-      const isDup = dedupedPool.some(d => {
-        const nd = normKw(d);
-        if (nd.length < 2) return false;
-        return n.includes(nd) || nd.includes(n);
-      });
-      if (!isDup) dedupedPool.push(kw);
-    }
-    console.log(`[preFilter] 중복 제거: ${filteredPool.length}개 → ${dedupedPool.length}개`);
-
-    const rawTrends = await getSearchTrends(dedupedPool);
-    if (!rawTrends.length) throw new Error('트렌드 조회 실패');
-
-    // 자가학습: DataLab 0.00 키워드 자동 블랙리스트 업데이트 (상위 랭킹 키워드는 제외)
-    // ranked는 아직 미정의 → rawTrends weeklyRate 기준 상위 20개를 보호 대상으로 설정
-    const top20Kws = [...rawTrends]
-      .sort((a, b) => b.weeklyRate - a.weeklyRate)
-      .slice(0, 20)
-      .map(k => k.keyword);
-    await updateAutoBlacklist(rawTrends, top20Kws);
-
-    // null 제외하고 medianPost 계산
-    const postValues = dedupedPool.map(kw => poolPostMap[kw]).filter(v => v != null);
-    const medianPost = postValues.length ? median(postValues) : 0;
-    const maxRate = Math.max(...rawTrends.map(t => t.weeklyRate), 1);
-
-    const addedAtMap = Object.fromEntries(
-      keywordPool.map(item => [item.keyword, item.addedAt || '2026-01-01'])
-    );
-
-    // ── 포스팅 급등 알고리즘 (blogSurge) ──
-    // 어제 포스팅 수와 비교해서 급등 키워드 감지
-    const postHistoryMap = {};
-    await Promise.all(dedupedPool.map(async (kw) => {
-      const postCount = poolPostMap[kw];
-      if (!postCount) return;
-      try {
-        const histKey = `post_history:${kw}`;
-        let hist = [];
-        const stored = await redis.get(histKey);
-        if (stored) hist = typeof stored === 'string' ? JSON.parse(stored) : stored;
-
-        // 30일 이상 된 기록 제거
-        const cutoff = new Date();
-        cutoff.setDate(cutoff.getDate() - 30);
-        const cutoffStr = cutoff.toISOString().slice(0, 10);
-        hist = hist.filter(h => h.date >= cutoffStr);
-
-        // 어제 포스팅 수
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        const yesterdayStr = yesterday.toISOString().slice(0, 10);
-        const yesterdayEntry = hist.find(h => h.date === yesterdayStr);
-        const yesterdayCount = yesterdayEntry?.count || 0;
-
-        // blogSurgeRate 계산
-        let blogSurgeRate = 0;
-        if (yesterdayCount >= 500 && postCount > yesterdayCount) {
-          blogSurgeRate = ((postCount - yesterdayCount) / yesterdayCount) * 100;
-        }
-
-        // 오늘 기록 추가 — count(누적), daily(전날 대비 신규) 함께 저장
-        const daily = yesterdayCount > 0 ? Math.max(0, postCount - yesterdayCount) : null;
-        hist = hist.filter(h => h.date !== today);
-        hist.push({ date: today, count: postCount, daily });
-        await redis.set(histKey, JSON.stringify(hist));
-
-        if (blogSurgeRate >= 20) {
-          postHistoryMap[kw] = { blogSurgeRate: Math.round(blogSurgeRate), yesterdayCount };
-          console.log(`[blogSurge] 급등 감지: ${kw} (+${Math.round(blogSurgeRate)}%, ${yesterdayCount}→${postCount})`);
-        }
-      } catch(e) {}
-    }));
-
-    console.log('[blogSurge] 급등 키워드:', Object.keys(postHistoryMap));
-
-    const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
-
-    const ranked = rawTrends.map(t => {
-      const postCount = poolPostMap[t.keyword] ?? poolPostNormMap[normKw(t.keyword)] ?? null;
-      const addedDate = addedAtMap[t.keyword] || today;
-      const daysInPool = daysDiff(addedDate);
-      const newBonus = daysInPool <= 3 ? 0.15 : 0;
-      const surge = postHistoryMap[t.keyword];
-      const blogSurgeRate = surge?.blogSurgeRate || 0;
-      const blogSurgeBonus = blogSurgeRate >= 20 ? 0.15 : blogSurgeRate >= 10 ? 0.08 : 0;
-
-      // 포스팅 수 규모 점수 — log 스케일 정규화 (상한 50만)
-      // 100건 ≈ 0.37, 5만건 ≈ 0.86, 50만건 = 1.0
-      const postVolumeScore = postCount && postCount > 0
-        ? Math.min(Math.log10(postCount) / Math.log10(500000), 1)
-        : 0;
-
-      // BTR Score: 변화율 중심 유지 (73%) + 포스팅 규모 보조 (12%)
-      const risingScore = t.risingRate > 0 ? (t.risingRate / maxRising) * 0.28 : 0;
-      const score = (t.weeklyRate / maxRate) * 0.45
-        + risingScore
-        + postVolumeScore * 0.12
-        + blogSurgeBonus
-        + newBonus;
-
-      return {
-        keyword: t.keyword,
-        score,
-        changeRate: t.weeklyRate,
-        risingRate: t.risingRate,
-        postCount,
-        blogSurgeRate,
-        blogSurge: blogSurgeRate >= 20,
-        trend: classifyTrend(t.weeklyRate, t.risingRate, postCount, medianPost),
-        values: t.values,
-        isNew: daysInPool <= 3,
-      };
-    })
-    .sort((a, b) => b.score - a.score);
-
-    // 최종 랭킹 — AI 기반 의미 중복 제거 후 상위 20개
-    // ranked 상위 30개를 AI에게 넘겨서 같은 이슈 중복 제거 (높은 점수 키워드 우선 유지)
-    const top30Keywords = ranked.slice(0, 30).map(k => k.keyword);
-    const dedupedKeywords = await deduplicateByMeaning(top30Keywords, []);
-    const dedupedSet = new Set(dedupedKeywords);
-    const deduped = ranked.filter(k => dedupedSet.has(k.keyword)).slice(0, 20);
-    // deduplicateByMeaning 실패 시 fallback
-    const finalRanked = (deduped.length >= 5 ? deduped : ranked.slice(0, 20))
-      .map((k, i) => ({ ...k, rank: i + 1 }));
-    console.log('[finalRanked] 중복제거 후:', finalRanked.length, '개', finalRanked.slice(0,3).map(k=>k.keyword));
-
-    const risingRanked = [...finalRanked]
-      .filter(k => k.risingRate > 0)
-      .sort((a, b) => b.risingRate - a.risingRate)
-      .slice(0, 10);
-
-    console.log('[ranked] top3:', finalRanked.slice(0, 3).map(k => k.keyword));
-    console.log('[rising] top3:', risingRanked.slice(0, 3).map(k => `${k.keyword}(${Math.round(k.risingRate)}%)`));
-    console.log('[trend 분포]', {
-      유행예감: finalRanked.filter(k => k.trend === '유행예감').length,
-      유행중: finalRanked.filter(k => k.trend === '유행중').length,
-      유행지남: finalRanked.filter(k => k.trend === '유행지남').length,
-    });
-    console.log('[신규 키워드]', finalRanked.filter(k => k.isNew).map(k => k.keyword));
-
-    // post_history 읽기 — polishKeywords 전에 원본 keyword로 조회 (중요: polish 후 keyword 불일치 방지)
-    // daily(전날 대비 신규 포스팅 수) 기반으로 그래프 구성 — null이면 데이터 없는 날
-    const originalKeywords = finalRanked.map(k => k.keyword);
-    const postHistoryCache = {};
-    await Promise.all(originalKeywords.map(async (origKw, i) => {
-      try {
-        const raw = await redis.get(`post_history:${origKw}`);
-        if (raw) {
-          const hist = typeof raw === 'string' ? JSON.parse(raw) : raw;
-          hist.sort((a, b) => a.date.localeCompare(b.date));
-          // daily 값 사용 (전날 대비 신규 포스팅 수), 없으면 null
-          const dailyValues = hist.map(h => h.daily != null ? h.daily : null);
-          // 모두 null이면 오늘 count 1개만 fallback
-          const hasData = dailyValues.some(v => v != null);
-          postHistoryCache[i] = hasData
-            ? dailyValues
-            : (hist.length > 0 ? [hist[hist.length - 1].count] : []);
-        }
-      } catch(e) {}
-    }));
-
-    // 키워드 정제 + 카테고리 분류
-    const { names: polishedNames, categories } = await polishKeywords(finalRanked.map(k => k.keyword));
-    console.log('[polishKeywords] 정제 결과:', polishedNames.slice(0, 5));
-    finalRanked.forEach((k, i) => {
-      k.keyword = polishedNames[i];
-      k.category = categories[i] || '';
-    });
-
-    // 코멘트 생성 — allTitles 매칭 방식으로 API 추가 호출 없이 20개 전부 생성
-    const commentsRaw = await generateComments(finalRanked.slice(0, 20), allTitles);
-    const comments = finalRanked.map((_, i) => commentsRaw[String(i)] || '');
-
-    // 이전 랭킹 읽어서 prevRank 계산
-    let prevRankMap = {};
-    try {
-      const prevRaw = await redis.get('trend_data');
-      if (prevRaw) {
-        const prevData = typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw;
-        prevRankMap = Object.fromEntries((prevData.keywords || []).map(k => [k.keyword, k.rank]));
-      }
-    } catch(e) {}
-
-    const result = {
-      updatedAt: new Date().toISOString(),
-      keywords: finalRanked.map((k, i) => ({
-        rank: i + 1,
-        prevRank: prevRankMap[k.keyword] || null,
-        keyword: k.keyword,
-        score: Math.round(k.score * 100),
-        changeRate: Math.round(k.changeRate),
-        risingRate: Math.round(k.risingRate),
-        postCount: k.postCount,
-        blogSurgeRate: k.blogSurgeRate || 0,
-        blogSurge: k.blogSurge || false,
-        category: k.category || '',
-        trend: k.trend,
-        isNew: k.isNew,
-        isMemetic: memeKeywords.includes(originalKeywords[i]) || memeKeywords.includes(k.keyword),
-        comment: comments[i] || '',
-        values: k.values.slice(-28),
-        scoreValues: [Math.round(k.score * 100)], // score_history 누적 후 rank.js에서 확장
-        postValues: postHistoryCache[i] || (k.postCount ? [k.postCount] : []),
-      })),
-      rising: risingRanked.map((k, i) => ({
-        rank: i + 1,
-        keyword: k.keyword,
-        risingRate: Math.round(k.risingRate),
-        postCount: k.postCount,
-        blogSurge: k.blogSurge || false,
-        trend: k.trend,
-        isNew: k.isNew,
-      })),
-    };
-
-    await redis.set('trend_data', JSON.stringify(result));
-
-    // 이전 TOP20 키워드 목록 저장 (다음 리프레시에서 pool 앵커로 사용)
-    // 연예인/인물/노이즈 필터링 후 저장
-    // 법적 민감 패턴만 유지 (나머지는 AI 게이팅 위임)
-    const LEGAL_NOISE_TOP20 = [
-      /성범죄/, /추행/, /그루밍/, /성폭/, /성추행/, /강간/, /음란/, /도촬/, /중절/,
-      /변호사/, /법률/, /법인/, /소송/, /로펌/,
-    ];
-    const top20Keywords = finalRanked
-      .filter(k => {
-        // 하락세 키워드 앵커 제외 (risingRate < -20 AND weeklyRate < -10)
-        if (k.risingRate < -20 && k.changeRate < -10) {
-          console.log('[top20_pool] 하락세 제외:', k.keyword, `(rising:${Math.round(k.risingRate)}%, weekly:${Math.round(k.changeRate)}%)`);
-          return false;
-        }
-        return true;
-      })
-      .map(k => k.keyword)
-      .filter(kw => {
-        if (LEGAL_NOISE_TOP20.some(p => p.test(kw))) return false;
-        if (kw.replace(/\s/g, '').length <= 2) return false;
-        return true;
-      });
-    // top20_pool 저장 전 AI 의미 중복 제거 (앵커끼리 BTS/방탄소년단 등 통합)
-    const top20Deduped = await deduplicateByMeaning(top20Keywords, []);
-    await redis.set('top20_pool', JSON.stringify(top20Deduped));
-    console.log('[top20_pool] 저장:', top20Deduped.slice(0, 5), `(중복제거: ${top20Keywords.length}→${top20Deduped.length}개)`);
-
-    // 히스토리 저장 - 0시 1회 cron이므로 항상 저장, 최대 30일치
-    const nowKST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
-    const dateStrKST = nowKST.toISOString().slice(0, 10);
-    try {
-      let history = [];
-      const raw = await redis.get('trend_history');
-      if (raw) history = typeof raw === 'string' ? JSON.parse(raw) : raw;
-      history = history.filter(h => h.date !== dateStrKST);
-      history.push({
-        date: dateStrKST,
-        timestamp: result.updatedAt,
-        keywords: finalRanked.slice(0, 10).map(k => ({
-          keyword: k.keyword,
-          changeRate: Math.round(k.changeRate),
-          risingRate: Math.round(k.risingRate),
-          score: Math.round(k.score * 100),
-          rank: k.rank,
-          blogSurge: k.blogSurge || false,
-        })),
-      });
-      history = history.filter(h => h.date);
-      history.sort((a, b) => b.date.localeCompare(a.date));
-      history = history.slice(0, 30);
-      await redis.set('trend_history', JSON.stringify(history));
-      console.log('[trend_history] 저장:', dateStrKST, '/ 누적:', history.length + '일치');
-    } catch(e) {
-      console.log('[trend_history] 저장 실패:', e.message);
-    }
-
-    // BTR Score 히스토리 저장 - 키워드별 score 시계열
-    try {
-      await Promise.all(finalRanked.slice(0, 20).map(async k => {
-        const scoreKey = `score_history:${k.keyword}`;
-        let scoreHist = [];
-        const stored = await redis.get(scoreKey);
-        if (stored) scoreHist = typeof stored === 'string' ? JSON.parse(stored) : stored;
-        scoreHist = scoreHist.filter(h => h.date !== dateStrKST);
-        scoreHist.push({ date: dateStrKST, score: Math.round(k.score * 100) });
-        scoreHist.sort((a, b) => a.date.localeCompare(b.date));
-        scoreHist = scoreHist.slice(-30); // 최대 30일치
-        await redis.set(scoreKey, JSON.stringify(scoreHist));
+      // 중간 결과 Redis에 저장 (TTL 1시간)
+      await redis.set('refresh_step1', JSON.stringify({
+        allTitles: allTitles.slice(0, 2000), // 토큰 절약
+        risingWords,
+        memeKeywords,
+        refined: [...refined, ...memeOnlyNew],
       }));
-      console.log('[score_history] 저장 완료:', finalRanked.slice(0, 3).map(k => `${k.keyword}(${Math.round(k.score * 100)})`));
-    } catch(e) {
-      console.log('[score_history] 저장 실패:', e.message);
+      console.log(`[refresh] step1 완료 → 제목 ${allTitles.length}개, 키워드 ${refined.length}개`);
+      return res.status(200).json({ success: true, step: 1, next: 2 });
     }
-    // 자가학습: 내일 그물 키워드 자동 갱신
-    await updateNetKeywords(risingWords);
 
-    res.status(200).json({
-      success: true,
-      updatedAt: result.updatedAt,
-      poolSize: keywordPool.length,
-      titlesCollected: allTitles.length,
-    });
+    // ────────────────────────────────────────
+    // STEP 2: pool 업데이트 + DataLab 조회
+    // HCX: deduplicateByMeaning(1) + cleanPoolDuplicates(1) = 2회
+    // ────────────────────────────────────────
+    if (step === 2) {
+      const s1Raw = await redis.get('refresh_step1');
+      if (!s1Raw) throw new Error('step1 데이터 없음. step=1 먼저 실행 필요');
+      const s1 = typeof s1Raw === 'string' ? JSON.parse(s1Raw) : s1Raw;
+      const { allTitles, risingWords, memeKeywords, refined } = s1;
+
+      const keywordPool = await updateKeywordPool(refined);
+      if (!keywordPool.length) throw new Error('키워드 풀 없음');
+
+      const poolKeywords = keywordPool.slice(0, 40).map(item => item.keyword);
+      const poolPostCounts = await getBlogPostCount(poolKeywords);
+      const poolPostMap = Object.fromEntries(poolPostCounts.map(p => [p.keyword, p.total]));
+      const poolPostNormMap = Object.fromEntries(poolPostCounts.map(p => [normKw(p.keyword), p.total]));
+
+      const filteredPool = poolKeywords.filter(kw => {
+        const cnt = poolPostMap[kw];
+        return cnt === null || cnt === undefined || cnt < 500000;
+      });
+      console.log(`[preFilter] 50만 초과 제거: ${poolKeywords.length}개 → ${filteredPool.length}개`);
+
+      const dedupedPool = [];
+      const sortedPool = [...filteredPool].sort((a, b) => normKw(a).length - normKw(b).length);
+      for (const kw of sortedPool) {
+        const n = normKw(kw);
+        if (n.length < 2) { dedupedPool.push(kw); continue; }
+        const isDup = dedupedPool.some(d => {
+          const nd = normKw(d);
+          if (nd.length < 2) return false;
+          return n.includes(nd) || nd.includes(n);
+        });
+        if (!isDup) dedupedPool.push(kw);
+      }
+      console.log(`[preFilter] 중복 제거: ${filteredPool.length}개 → ${dedupedPool.length}개`);
+
+      const rawTrends = await getSearchTrends(dedupedPool);
+      if (!rawTrends.length) throw new Error('트렌드 조회 실패');
+
+      const top20Kws = [...rawTrends].sort((a, b) => b.weeklyRate - a.weeklyRate).slice(0, 20).map(k => k.keyword);
+      await updateAutoBlacklist(rawTrends, top20Kws);
+
+      const postHistoryMap = {};
+      await Promise.all(dedupedPool.map(async (kw) => {
+        const postCount = poolPostMap[kw];
+        if (!postCount) return;
+        try {
+          const histKey = `post_history:${kw}`;
+          let hist = [];
+          const stored = await redis.get(histKey);
+          if (stored) hist = typeof stored === 'string' ? JSON.parse(stored) : stored;
+          const cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 30);
+          hist = hist.filter(h => h.date >= cutoff.toISOString().slice(0, 10));
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          const yesterdayStr = yesterday.toISOString().slice(0, 10);
+          const yesterdayEntry = hist.find(h => h.date === yesterdayStr);
+          const yesterdayCount = yesterdayEntry?.count || 0;
+          let blogSurgeRate = 0;
+          if (yesterdayCount >= 500 && postCount > yesterdayCount) {
+            blogSurgeRate = ((postCount - yesterdayCount) / yesterdayCount) * 100;
+          }
+          const daily = yesterdayCount > 0 ? Math.max(0, postCount - yesterdayCount) : null;
+          hist = hist.filter(h => h.date !== today);
+          hist.push({ date: today, count: postCount, daily });
+          await redis.set(histKey, JSON.stringify(hist));
+          if (blogSurgeRate >= 20) {
+            postHistoryMap[kw] = { blogSurgeRate: Math.round(blogSurgeRate), yesterdayCount };
+            console.log(`[blogSurge] 급등 감지: ${kw} (+${Math.round(blogSurgeRate)}%)`);
+          }
+        } catch(e) {}
+      }));
+      console.log('[blogSurge] 급등 키워드:', Object.keys(postHistoryMap));
+
+      await redis.set('refresh_step2', JSON.stringify({
+        allTitles,
+        risingWords,
+        memeKeywords,
+        keywordPool,
+        rawTrends,
+        poolPostMap,
+        poolPostNormMap,
+        postHistoryMap,
+        dedupedPool,
+      }));
+      console.log(`[refresh] step2 완료 → rawTrends ${rawTrends.length}개`);
+      return res.status(200).json({ success: true, step: 2, next: 3 });
+    }
+
+    // ────────────────────────────────────────
+    // STEP 3: 랭킹 계산 + 코멘트 + 저장
+    // HCX: deduplicateByMeaning(1) + polishKeywords(1) + generateComments(1) = 3회
+    // ────────────────────────────────────────
+    if (step === 3) {
+      const s2Raw = await redis.get('refresh_step2');
+      if (!s2Raw) throw new Error('step2 데이터 없음. step=2 먼저 실행 필요');
+      const s2 = typeof s2Raw === 'string' ? JSON.parse(s2Raw) : s2Raw;
+      const { allTitles, risingWords, memeKeywords, keywordPool, rawTrends, poolPostMap, poolPostNormMap, postHistoryMap, dedupedPool } = s2;
+
+      const postValues2 = dedupedPool.map(kw => poolPostMap[kw]).filter(v => v != null);
+      const medianPost = postValues2.length ? median(postValues2) : 0;
+      const maxRate = Math.max(...rawTrends.map(t => t.weeklyRate), 1);
+      const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
+      const addedAtMap = Object.fromEntries(keywordPool.map(item => [item.keyword, item.addedAt || '2026-01-01']));
+
+      const ranked = rawTrends.map(t => {
+        const postCount = poolPostMap[t.keyword] ?? poolPostNormMap[normKw(t.keyword)] ?? null;
+        const addedDate = addedAtMap[t.keyword] || today;
+        const daysInPool = daysDiff(addedDate);
+        const newBonus = daysInPool <= 3 ? 0.15 : 0;
+        const surge = postHistoryMap[t.keyword];
+        const blogSurgeRate = surge?.blogSurgeRate || 0;
+        const blogSurgeBonus = blogSurgeRate >= 20 ? 0.15 : blogSurgeRate >= 10 ? 0.08 : 0;
+        const postVolumeScore = postCount && postCount > 0 ? Math.min(Math.log10(postCount) / Math.log10(500000), 1) : 0;
+        const risingScore = t.risingRate > 0 ? (t.risingRate / maxRising) * 0.28 : 0;
+        const score = (t.weeklyRate / maxRate) * 0.45 + risingScore + postVolumeScore * 0.12 + blogSurgeBonus + newBonus;
+        return {
+          keyword: t.keyword, score, changeRate: t.weeklyRate, risingRate: t.risingRate,
+          postCount, blogSurgeRate, blogSurge: blogSurgeRate >= 20,
+          trend: classifyTrend(t.weeklyRate, t.risingRate, postCount, medianPost),
+          values: t.values, isNew: daysInPool <= 3,
+        };
+      }).sort((a, b) => b.score - a.score);
+
+      const top30Keywords = ranked.slice(0, 30).map(k => k.keyword);
+      const dedupedKeywords = await deduplicateByMeaning(top30Keywords, []);
+      const dedupedSet = new Set(dedupedKeywords);
+      const deduped = ranked.filter(k => dedupedSet.has(k.keyword)).slice(0, 20);
+      const finalRanked = (deduped.length >= 5 ? deduped : ranked.slice(0, 20)).map((k, i) => ({ ...k, rank: i + 1 }));
+      console.log('[finalRanked] 중복제거 후:', finalRanked.length, '개', finalRanked.slice(0,3).map(k=>k.keyword));
+
+      const risingRanked = [...finalRanked].filter(k => k.risingRate > 0).sort((a, b) => b.risingRate - a.risingRate).slice(0, 10);
+      console.log('[ranked] top3:', finalRanked.slice(0, 3).map(k => k.keyword));
+      console.log('[rising] top3:', risingRanked.slice(0, 3).map(k => `${k.keyword}(${Math.round(k.risingRate)}%)`));
+      console.log('[trend 분포]', {
+        유행예감: finalRanked.filter(k => k.trend === '유행예감').length,
+        유행중: finalRanked.filter(k => k.trend === '유행중').length,
+        유행지남: finalRanked.filter(k => k.trend === '유행지남').length,
+      });
+      console.log('[신규 키워드]', finalRanked.filter(k => k.isNew).map(k => k.keyword));
+
+      const originalKeywords = finalRanked.map(k => k.keyword);
+      const postHistoryCache = {};
+      await Promise.all(originalKeywords.map(async (origKw, i) => {
+        try {
+          const raw = await redis.get(`post_history:${origKw}`);
+          if (raw) {
+            const hist = typeof raw === 'string' ? JSON.parse(raw) : raw;
+            hist.sort((a, b) => a.date.localeCompare(b.date));
+            const dailyValues = hist.map(h => h.daily != null ? h.daily : null);
+            const hasData = dailyValues.some(v => v != null);
+            postHistoryCache[i] = hasData ? dailyValues : (hist.length > 0 ? [hist[hist.length - 1].count] : []);
+          }
+        } catch(e) {}
+      }));
+
+      const { names: polishedNames, categories } = await polishKeywords(finalRanked.map(k => k.keyword));
+      console.log('[polishKeywords] 정제 결과:', polishedNames.slice(0, 5));
+      finalRanked.forEach((k, i) => { k.keyword = polishedNames[i]; k.category = categories[i] || ''; });
+
+      const commentsRaw = await generateComments(finalRanked.slice(0, 20), allTitles);
+      const comments = finalRanked.map((_, i) => commentsRaw[String(i)] || '');
+
+      let prevRankMap = {};
+      try {
+        const prevRaw = await redis.get('trend_data');
+        if (prevRaw) {
+          const prevData = typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw;
+          prevRankMap = Object.fromEntries((prevData.keywords || []).map(k => [k.keyword, k.rank]));
+        }
+      } catch(e) {}
+
+      const result = {
+        updatedAt: new Date().toISOString(),
+        keywords: finalRanked.map((k, i) => ({
+          rank: i + 1, prevRank: prevRankMap[k.keyword] || null, keyword: k.keyword,
+          score: Math.round(k.score * 100), changeRate: Math.round(k.changeRate), risingRate: Math.round(k.risingRate),
+          postCount: k.postCount, blogSurgeRate: k.blogSurgeRate || 0, blogSurge: k.blogSurge || false,
+          category: k.category || '', trend: k.trend, isNew: k.isNew,
+          isMemetic: memeKeywords.includes(originalKeywords[i]) || memeKeywords.includes(k.keyword),
+          comment: comments[i] || '', values: k.values.slice(-28),
+          scoreValues: [Math.round(k.score * 100)],
+          postValues: postHistoryCache[i] || (k.postCount ? [k.postCount] : []),
+        })),
+        rising: risingRanked.map((k, i) => ({
+          rank: i + 1, keyword: k.keyword, risingRate: Math.round(k.risingRate),
+          postCount: k.postCount, blogSurge: k.blogSurge || false, trend: k.trend, isNew: k.isNew,
+        })),
+      };
+
+      await redis.set('trend_data', JSON.stringify(result));
+      await redis.set('refresh_step3', JSON.stringify({ finalRanked, risingWords }));
+      console.log(`[refresh] step3 완료 → trend_data 저장`);
+      return res.status(200).json({ success: true, step: 3, next: 4 });
+    }
+
+    // ────────────────────────────────────────
+    // STEP 4: 히스토리 저장 + top20_pool + netKeywords 갱신
+    // HCX: deduplicateByMeaning(1) + updateNetKeywords(1) = 2회
+    // ────────────────────────────────────────
+    if (step === 4) {
+      const s3Raw = await redis.get('refresh_step3');
+      if (!s3Raw) throw new Error('step3 데이터 없음. step=3 먼저 실행 필요');
+      const s3 = typeof s3Raw === 'string' ? JSON.parse(s3Raw) : s3Raw;
+      const { finalRanked, risingWords } = s3;
+
+      const LEGAL_NOISE_TOP20 = [/성범죄/, /추행/, /그루밍/, /성폭/, /성추행/, /강간/, /음란/, /도촬/, /중절/, /변호사/, /법률/, /법인/, /소송/, /로펌/];
+      const top20Keywords = finalRanked
+        .filter(k => {
+          if (k.risingRate < -20 && k.changeRate < -10) {
+            console.log('[top20_pool] 하락세 제외:', k.keyword);
+            return false;
+          }
+          return true;
+        })
+        .map(k => k.keyword)
+        .filter(kw => {
+          if (LEGAL_NOISE_TOP20.some(p => p.test(kw))) return false;
+          if (kw.replace(/\s/g, '').length <= 2) return false;
+          return true;
+        });
+
+      const top20Deduped = await deduplicateByMeaning(top20Keywords, []);
+      await redis.set('top20_pool', JSON.stringify(top20Deduped));
+      console.log('[top20_pool] 저장:', top20Deduped.slice(0, 5), `(중복제거: ${top20Keywords.length}→${top20Deduped.length}개)`);
+
+      const nowKST = new Date(new Date().getTime() + 9 * 60 * 60 * 1000);
+      const dateStrKST = nowKST.toISOString().slice(0, 10);
+      try {
+        let history = [];
+        const raw = await redis.get('trend_history');
+        if (raw) history = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        history = history.filter(h => h.date !== dateStrKST);
+        history.push({
+          date: dateStrKST, timestamp: new Date().toISOString(),
+          keywords: finalRanked.slice(0, 10).map(k => ({
+            keyword: k.keyword, changeRate: Math.round(k.changeRate),
+            risingRate: Math.round(k.risingRate), score: Math.round(k.score * 100), rank: k.rank, blogSurge: k.blogSurge || false,
+          })),
+        });
+        history = history.filter(h => h.date).sort((a, b) => b.date.localeCompare(a.date)).slice(0, 30);
+        await redis.set('trend_history', JSON.stringify(history));
+        console.log('[trend_history] 저장:', dateStrKST, '/ 누적:', history.length + '일치');
+      } catch(e) { console.log('[trend_history] 저장 실패:', e.message); }
+
+      try {
+        await Promise.all(finalRanked.slice(0, 20).map(async k => {
+          const scoreKey = `score_history:${k.keyword}`;
+          let scoreHist = [];
+          const stored = await redis.get(scoreKey);
+          if (stored) scoreHist = typeof stored === 'string' ? JSON.parse(stored) : stored;
+          scoreHist = scoreHist.filter(h => h.date !== dateStrKST);
+          scoreHist.push({ date: dateStrKST, score: Math.round(k.score * 100) });
+          scoreHist.sort((a, b) => a.date.localeCompare(b.date));
+          scoreHist = scoreHist.slice(-30);
+          await redis.set(scoreKey, JSON.stringify(scoreHist));
+        }));
+        console.log('[score_history] 저장 완료:', finalRanked.slice(0, 3).map(k => `${k.keyword}(${Math.round(k.score * 100)})`));
+      } catch(e) { console.log('[score_history] 저장 실패:', e.message); }
+
+      await updateNetKeywords(risingWords);
+
+      // 임시 데이터 정리
+      await Promise.all([
+        redis.del('refresh_step1'),
+        redis.del('refresh_step2'),
+        redis.del('refresh_step3'),
+      ]);
+
+      console.log(`[refresh] step4 완료 → 전체 refresh 완료`);
+      return res.status(200).json({ success: true, step: 4, done: true });
+    }
+
+    throw new Error(`알 수 없는 step: ${step}`);
+
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: err.message });
+    console.error(`[refresh] step${req.query?.step || '?'} 오류:`, err.message);
+    res.status(500).json({ error: err.message, step: req.query?.step });
   }
 };
+
