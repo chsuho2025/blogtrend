@@ -276,9 +276,24 @@ async function extractTrendKeywords(titles, risingWords = []) {
         }
       );
       const data = await res.json();
-      const text = data.result?.message?.content || '[]';
-      const keywords = JSON.parse(text.replace(/```json|```/g, '').trim());
-      const limited = keywords.slice(0, 15); // chunk당 최대 15개 강제 제한
+      const raw = data.result?.message?.content || '[]';
+      // JSON 클렌징: 백틱 제거 → 배열 추출 → 제어문자 제거
+      let text = raw.replace(/```json|```/g, '').trim();
+      const arrMatch = text.match(/\[[\s\S]*\]/);
+      text = arrMatch ? arrMatch[0] : '[]';
+      text = text.replace(/[\x00-\x1F\x7F]/g, ' ');
+      let keywords = [];
+      try {
+        keywords = JSON.parse(text);
+      } catch(parseErr) {
+        // 파싱 실패 시 따옴표 안 문자열 직접 추출
+        const extracted = [...text.matchAll(/"([^"\\]*(?:\\.[^"\\]*)*)"/g)].map(m => m[1]);
+        keywords = extracted.length > 0 ? extracted : [];
+        if (extracted.length > 0) {
+          console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1} 파싱 복구: ${extracted.length}개`);
+        }
+      }
+      const limited = Array.isArray(keywords) ? keywords.slice(0, 15) : [];
       console.log(`[extractTrendKeywords] chunk${Math.floor(i / CHUNK_SIZE) + 1}: ${limited.length}개 →`, limited);
       allKeywords.push(...limited);
     } catch (e) {
