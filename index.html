@@ -169,6 +169,7 @@
     .badge-up    { color: var(--green); background: var(--green-dim); }
     .badge-down  { color: var(--gray-4); background: var(--gray-6); }
     .badge-surge { color: #1565C0; background: #E3F2FD; }
+    .badge-meme  { color: #6A1B9A; background: #F3E5F5; }
 
     .rank-rate-col {
       text-align: right; font-size: 13px; font-weight: 700;
@@ -842,13 +843,15 @@ function buildRising3(kws) {
     const rateStr = kw.risingRate >= 1000
       ? '+' + (kw.risingRate / 1000).toFixed(1) + 'K%'
       : '+' + Math.round(kw.risingRate) + '%';
-    const badge = kw.blogSurge
-      ? '<span class="rising3-badge rising3-badge-surge">📈 포스팅 급등</span>'
-      : kw.isEarlyTrend
-        ? '<span class="rising3-badge rising3-badge-early">🚀 조기감지</span>'
-        : kw.isNew
-          ? '<span class="rising3-badge rising3-badge-new">NEW</span>'
-          : '';
+    const badge = kw.isMemetic
+      ? '<span class="rising3-badge" style="background:#F3E5F5;color:#6A1B9A;">💬 신조어/밈</span>'
+      : kw.blogSurge
+        ? '<span class="rising3-badge rising3-badge-surge">📈 포스팅 급등</span>'
+        : kw.isEarlyTrend
+          ? '<span class="rising3-badge rising3-badge-early">🚀 조기감지</span>'
+          : kw.isNew
+            ? '<span class="rising3-badge rising3-badge-new">NEW</span>'
+            : '';
     const comment = kw.comment || '';
 
     return `<div class="rising3-item ${itemCls[i]}" onclick="openKwDetail('${kw.keyword.replace(/'/g,"\'")}')">
@@ -875,6 +878,7 @@ function buildRankRows(kws) {
     const isChecked = false;
     const accentColor = isChecked ? 'var(--green)' : (kw.rank <= 3 ? 'var(--gray-2)' : 'var(--gray-5)');
     const badges = [
+      kw.isMemetic ? '<span class="badge badge-meme">💬 신조어</span>' : '',
       kw.isEarlyTrend ? '<span class="badge badge-early">🚀 조기감지</span>' : '',
       kw.blogSurge ? '<span class="badge badge-surge">📈 포스팅급등</span>' : '',
       kw.risingRate >= 80 ? '<span class="badge badge-hot">HOT</span>' : '',
@@ -955,6 +959,7 @@ function openKwDetail(keyword) {
 
   // 배지
   const badges = [
+    kw.isMemetic ? '<span class="badge badge-meme">💬 신조어/밈</span>' : '',
     kw.isEarlyTrend ? '<span class="badge badge-early">🚀 조기감지</span>' : '',
     kw.blogSurge ? '<span class="badge badge-surge">📈 포스팅급등</span>' : '',
     kw.risingRate >= 80 ? '<span class="badge badge-hot">HOT</span>' : '',
