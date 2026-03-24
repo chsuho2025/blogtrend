@@ -1081,9 +1081,7 @@ function drawKwDetailChart(kw, days) {
   // 차트 헤더 (레이블 + 피크 배지)
   const header = document.createElement('div');
   header.className = 'chart-header';
-  header.innerHTML = `
-    <span class="chart-header-label">검색지수 · ${days}일</span>
-    ${peakLabel ? `<span class="chart-peak-badge">🏔 ${peakLabel}</span>` : ''}`;
+  header.innerHTML = `<span class="chart-header-label">검색지수 · ${days}일</span>`;
   wrap.insertBefore(header, wrap.firstChild);
 
   const ctx = document.getElementById('kwDetailChart')?.getContext('2d');
@@ -1107,8 +1105,10 @@ function drawKwDetailChart(kw, days) {
         return gradient;
       },
       borderWidth: 2.5,
-      pointRadius: nonNull.length <= 2 ? 5 : 0,
-      pointBackgroundColor: '#2DB400',
+      pointRadius: values.map((v, i) => i === peakIdx ? 6 : (nonNull.length <= 2 ? 5 : 0)),
+      pointBackgroundColor: values.map((v, i) => i === peakIdx ? '#fff' : '#2DB400'),
+      pointBorderColor: '#2DB400',
+      pointBorderWidth: values.map((v, i) => i === peakIdx ? 2.5 : 0),
       pointHoverRadius: 5,
       pointHoverBackgroundColor: '#2DB400',
       tension: 0.35,
@@ -1118,7 +1118,7 @@ function drawKwDetailChart(kw, days) {
     options: {
       responsive: true, maintainAspectRatio: false,
       animation: { duration: 400, easing: 'easeOutQuart' },
-      layout: { padding: { top: 8, bottom: 4, right: 12, left: 4 } },
+      layout: { padding: { top: 32, bottom: 4, right: 12, left: 4 } },
       interaction: { mode: 'index', intersect: false },
       plugins: {
         legend: { display: false },
@@ -1136,7 +1136,7 @@ function drawKwDetailChart(kw, days) {
             label: (ctx) => {
               const v = ctx.parsed.y;
               if (v == null) return '데이터 없음';
-              return `검색지수 ${v}`;
+              return ctx.dataIndex === peakIdx ? `검색지수 ${v}  최고점` : `검색지수 ${v}`;
             }
           }
         }
@@ -1154,7 +1154,46 @@ function drawKwDetailChart(kw, days) {
           border: { display: false }
         }
       }
-    }
+    },
+    plugins: [{
+      id: 'peakLabel',
+      afterDatasetsDraw(chart) {
+        if (peakIdx < 0 || !peakLabel) return;
+        const {ctx: c, chartArea} = chart;
+        const meta = chart.getDatasetMeta(0);
+        const pt = meta.data[peakIdx];
+        if (!pt) return;
+        const x = pt.x, y = pt.y;
+        const label = peakLabel;
+        c.save();
+        c.font = '700 10px Pretendard, sans-serif';
+        const tw = c.measureText(label).width;
+        const pw = tw + 16, ph = 20, pr = 10;
+        let bx = x - pw / 2;
+        bx = Math.max(chartArea.left + 2, Math.min(bx, chartArea.right - pw - 2));
+        const by = Math.max(chartArea.top + 2, y - ph - 10);
+        // 말풍선 배경
+        c.beginPath();
+        c.roundRect(bx, by, pw, ph, pr);
+        c.fillStyle = '#111111';
+        c.fill();
+        // 말풍선 꼬리
+        const tx = Math.min(Math.max(x, bx + 8), bx + pw - 8);
+        c.beginPath();
+        c.moveTo(tx - 4, by + ph);
+        c.lineTo(tx + 4, by + ph);
+        c.lineTo(tx, by + ph + 5);
+        c.closePath();
+        c.fillStyle = '#111111';
+        c.fill();
+        // 텍스트
+        c.fillStyle = '#ffffff';
+        c.textAlign = 'center';
+        c.textBaseline = 'middle';
+        c.fillText(label, bx + pw / 2, by + ph / 2);
+        c.restore();
+      }
+    }]
   });
 }
 
