@@ -763,10 +763,32 @@ async function loadHistory() {
 async function manualRefresh() {
   const btn = document.getElementById('refreshBtn');
   const icon = document.getElementById('refreshIcon');
+  const statusEl = document.getElementById('rankTime');
   btn.classList.add('loading'); icon.classList.add('spin');
-  try { await fetch('/api/refresh'); await loadData(); }
-  catch(e) { alert('새로고침 실패'); }
-  finally { btn.classList.remove('loading'); icon.classList.remove('spin'); }
+  try {
+    const steps = [
+      { step: 1, label: '블로그 수집 중...' },
+      { step: 2, label: '트렌드 분석 중...' },
+      { step: 3, label: '랭킹 계산 중...' },
+      { step: 4, label: '저장 중...' },
+    ];
+    for (const { step, label } of steps) {
+      statusEl.textContent = label;
+      const res = await fetch(`/api/refresh?step=${step}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `step${step} 실패`);
+      }
+      const data = await res.json();
+      if (data.done) break;
+    }
+    await loadData();
+  } catch(e) {
+    alert('새로고침 실패: ' + e.message);
+  } finally {
+    btn.classList.remove('loading');
+    icon.classList.remove('spin');
+  }
 }
 
 // ── 메인 렌더 ──

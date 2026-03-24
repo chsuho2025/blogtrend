@@ -1,8 +1,20 @@
 {
   "crons": [
     {
-      "path": "/api/refresh",
+      "path": "/api/refresh?step=1",
       "schedule": "0 15 * * *"
+    },
+    {
+      "path": "/api/refresh?step=2",
+      "schedule": "1 15 * * *"
+    },
+    {
+      "path": "/api/refresh?step=3",
+      "schedule": "2 15 * * *"
+    },
+    {
+      "path": "/api/refresh?step=4",
+      "schedule": "3 15 * * *"
     }
   ]
 }
