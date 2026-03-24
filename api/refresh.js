@@ -845,16 +845,24 @@ async function getSearchTrends(keywords) {
       if (data.results) {
         return data.results.map(result => {
           const values = result.data ? result.data.map(d => d.ratio) : [];
+          const nonZero = values.filter(v => v > 0);
           const recent7 = values.slice(-7);
           const prev7 = values.slice(-14, -7);
           const weeklyRate = avg(prev7) > 0 ? ((avg(recent7) - avg(prev7)) / avg(prev7)) * 100 : 0;
           const recent3 = values.slice(-3);
           const prev3 = values.slice(-6, -3);
           const risingRate = avg(prev3) > 0 ? ((avg(recent3) - avg(prev3)) / avg(prev3)) * 100 : 0;
-          if (values.length === 0) console.log(`[getSearchTrends] values 없음: ${result.title}`);
+          if (values.length === 0) {
+            console.log(`[getSearchTrends] values 없음 (data 배열 미존재): ${result.title}`);
+          } else if (nonZero.length === 0) {
+            console.log(`[getSearchTrends] values 전체 0 (검색량 없음): ${result.title}`);
+          } else if (nonZero.length < 7) {
+            console.log(`[getSearchTrends] values 부분 데이터 (${nonZero.length}일치): ${result.title}`);
+          }
           return { keyword: result.title, weeklyRate, risingRate, values };
         });
       }
+      console.log(`[getSearchTrends] chunk ${ci} results 없음, 응답:`, JSON.stringify(data).slice(0, 300));
       // results 없으면 재시도
       if (retry < 2) {
         console.log(`[getSearchTrends] chunk ${ci} results 없음 → 재시도 ${retry + 1}`);
@@ -1263,11 +1271,18 @@ module.exports = async (req, res) => {
       const maxRising = Math.max(...rawTrends.map(r => r.risingRate), 1);
       const addedAtMap = Object.fromEntries(keywordPool.map(item => [item.keyword, item.addedAt || '2026-01-01']));
 
-      const ranked = rawTrends.map(t => {
+      // values가 전부 0인 키워드는 검색량 없음 → 랭킹 제외
+      const validTrends = rawTrends.filter(t => t.values && t.values.some(v => v > 0));
+      const noDataKws = rawTrends.filter(t => !t.values || !t.values.some(v => v > 0)).map(t => t.keyword);
+      if (noDataKws.length > 0) console.log('[ranked] 검색량 없어 제외:', noDataKws);
+
+      const ranked = validTrends.map(t => {
         const postCount = poolPostMap[t.keyword] ?? poolPostNormMap[normKw(t.keyword)] ?? null;
         const addedDate = addedAtMap[t.keyword] || today;
         const daysInPool = daysDiff(addedDate);
-        const newBonus = daysInPool <= 3 ? 0.15 : 0;
+        // newBonus: 검색량 있는 신규 키워드만 보너스 (검색량 0이면 트렌드 아님)
+      const hasSearchData = t.values && t.values.some(v => v > 0);
+      const newBonus = (daysInPool <= 3 && hasSearchData) ? 0.15 : 0;
         const surge = postHistoryMap[t.keyword];
         const blogSurgeRate = surge?.blogSurgeRate || 0;
         const blogSurgeBonus = blogSurgeRate >= 20 ? 0.15 : blogSurgeRate >= 10 ? 0.08 : 0;
