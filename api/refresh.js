@@ -401,6 +401,7 @@ async function extractTrendKeywords(titles, risingWords = []) {
 - 영화/드라마/게임 타이틀 (예: 케이팝 데몬 헌터스, 붉은사막, 프로젝트 헤일메리)
 
 ★ 절대 뽑으면 안 되는 것:
+- 20자 초과 키워드 (DataLab 검색 불가 → 무조건 제외)
 - 단일 브랜드명만 (나쁨: "나이키", "아디다스", "이마트" → 반드시 뒤에 제품/카테고리 붙어야 함)
 - 단일 범용어 (나쁨: "레시피", "피부", "가디건", "강아지", "웨이팅", "해결")
 - 5자 이하 단독어 (나쁨: "봄", "루틴", "하울", "갓생", "피부")
@@ -409,13 +410,13 @@ async function extractTrendKeywords(titles, risingWords = []) {
 - 다이어트/체중 인물 서사 (나쁨: "풍자 28kg 감량", "김현숙 다이어트")
 - 법률/의료/부동산 광고
 - 지역 상호명/맛집명 (나쁨: "선릉 버터떡 맛집", "성수 오밀파스타")
-- 모델번호/시리얼번호
+- 모델번호/시리얼번호/용량 포함 (나쁨: "삼성 갤럭시 S25 512GB AI폰", "LG 퓨리케어 360도 공기청정기")
 - 날짜/채용/일정 정보
 - 앱 퀴즈/이벤트 정답 (예: 신한 쏠퀴즈, 카카오뱅크 AI퀴즈, 캐시워크 3월23일 정답)
 - 쇼핑몰 적립금/쿠폰 이벤트 (예: CJ온스타일 적립금, 카카오페이 쿠폰받기, 롯데하이마트 창립기념)
 - 정부 보조금/지원금 정보 (예: 청년 일자리 도약 장려금, 청년 월세 지원, 국민취업지원제도)
 - 재테크/주식/코인 정보 (예: 공모주 청약, 코스피 폭락, 비트코인 시세)
-- 블로그 제목 그대로 복사${risingContext}
+- 블로그 제목 그대로 복사 (나쁨: "LG 퓨리케어 360도 공기청정기 케어솔루션 사용 후기")${risingContext}
 
 반드시 JSON 배열로만, 15개 이하: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
@@ -460,6 +461,17 @@ async function extractTrendKeywords(titles, risingWords = []) {
 
   // 코드 필터: 타입, 최소 길이, 특수문자, 띄어쓰기 중복
   const norm = s => s.replace(/\s+/g, '').toLowerCase();
+  // 코드 레벨 길이 필터 — 20자 초과 키워드는 DataLab 조회 안 됨
+  allKeywords = allKeywords.filter(kw => {
+    if (typeof kw !== 'string') return false;
+    const clean = kw.replace(/\s/g, '');
+    if (clean.length > 20) {
+      console.log(`[extractTrendKeywords] 20자 초과 제거: ${kw}`);
+      return false;
+    }
+    return true;
+  });
+
   const seenNorm = new Set();
   // 광고성/노이즈 키워드 패턴
   const NOISE_KW = [
@@ -816,6 +828,15 @@ async function updateKeywordPool(newKeywords) {
 // ─────────────────────────────────────────
 // Step 4: DataLab 검색량 조회
 // ─────────────────────────────────────────
+// 긴 키워드 → DataLab 조회용 단축 키워드 생성
+// 원본 키워드는 유지하고 조회만 단축어로
+function shortenForDatalab(kw) {
+  const tokens = kw.trim().split(/\s+/);
+  if (tokens.length <= 2) return kw; // 2단어 이하는 그대로
+  // 브랜드+제품 패턴: 앞 2단어만 (예: '스타벅스 체리블라썸 백도 크림' → '스타벅스 체리블라썸')
+  return tokens.slice(0, 2).join(' ');
+}
+
 async function getSearchTrends(keywords) {
   const chunks = [];
   for (let i = 0; i < keywords.length; i += 5) {
@@ -823,6 +844,31 @@ async function getSearchTrends(keywords) {
   }
 
   const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  // DataLab API 단일 키워드 조회 (단축어 사용, 원본 키워드로 title 매핑)
+  const fetchSingle = async (origKw, queryKw) => {
+    try {
+      const res = await fetch('https://openapi.naver.com/v1/datalab/search', {
+        method: 'POST',
+        headers: {
+          'X-Naver-Client-Id': process.env.NAVER_CLIENT_ID,
+          'X-Naver-Client-Secret': process.env.NAVER_CLIENT_SECRET,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startDate: getDateString(-28),
+          endDate: getDateString(0),
+          timeUnit: 'date',
+          keywordGroups: [{ groupName: origKw, keywords: [queryKw] }],
+        }),
+      });
+      const data = await res.json();
+      if (data.results && data.results[0]) {
+        return data.results[0].data ? data.results[0].data.map(d => d.ratio) : [];
+      }
+    } catch(e) {}
+    return [];
+  };
 
   const fetchChunk = async (chunk, ci, retry = 0) => {
     const keywordGroups = chunk.map(kw => ({ groupName: kw, keywords: [kw] }));
@@ -843,33 +889,40 @@ async function getSearchTrends(keywords) {
       });
       const data = await res.json();
       if (data.results) {
-        return data.results.map(result => {
-          const values = result.data ? result.data.map(d => d.ratio) : [];
+        // values 전부 0인 키워드는 단축어로 재조회
+        const results = await Promise.all(data.results.map(async result => {
+          let values = result.data ? result.data.map(d => d.ratio) : [];
           const nonZero = values.filter(v => v > 0);
+
+          if (nonZero.length === 0 && result.title.split(/\s+/).length > 2) {
+            const shortened = shortenForDatalab(result.title);
+            if (shortened !== result.title) {
+              console.log(`[getSearchTrends] 단축 재조회: "${result.title}" → "${shortened}"`);
+              const retryValues = await fetchSingle(result.title, shortened);
+              if (retryValues.filter(v => v > 0).length > 0) {
+                values = retryValues;
+                console.log(`[getSearchTrends] 단축 성공: "${result.title}" (${retryValues.filter(v=>v>0).length}일치)`);
+              } else {
+                console.log(`[getSearchTrends] 단축도 0: "${result.title}"`);
+              }
+            }
+          }
+
           const recent7 = values.slice(-7);
           const prev7 = values.slice(-14, -7);
           const weeklyRate = avg(prev7) > 0 ? ((avg(recent7) - avg(prev7)) / avg(prev7)) * 100 : 0;
           const recent3 = values.slice(-3);
           const prev3 = values.slice(-6, -3);
           const risingRate = avg(prev3) > 0 ? ((avg(recent3) - avg(prev3)) / avg(prev3)) * 100 : 0;
-          if (values.length === 0) {
-            console.log(`[getSearchTrends] values 없음 (data 배열 미존재): ${result.title}`);
-          } else if (nonZero.length === 0) {
-            console.log(`[getSearchTrends] values 전체 0 (검색량 없음): ${result.title}`);
-          } else if (nonZero.length < 7) {
-            console.log(`[getSearchTrends] values 부분 데이터 (${nonZero.length}일치): ${result.title}`);
-          }
           return { keyword: result.title, weeklyRate, risingRate, values };
-        });
+        }));
+        return results;
       }
-      console.log(`[getSearchTrends] chunk ${ci} results 없음, 응답:`, JSON.stringify(data).slice(0, 300));
-      // results 없으면 재시도
       if (retry < 2) {
-        console.log(`[getSearchTrends] chunk ${ci} results 없음 → 재시도 ${retry + 1}`);
         await sleep(500);
         return fetchChunk(chunk, ci, retry + 1);
       }
-      console.log(`[getSearchTrends] chunk ${ci} 최종 실패:`, JSON.stringify(data).slice(0, 200));
+      console.log(`[getSearchTrends] chunk ${ci} 최종 실패`);
     } catch (e) {
       if (retry < 2) {
         await sleep(500);
