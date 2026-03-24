@@ -288,38 +288,6 @@
       .modal-box { max-height: 85vh; border-radius: var(--radius) var(--radius) 0 0; max-width: 100%; }
     }
 
-    /* ── 히스토리 팝업 ── */
-    .hist-modal-overlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(0,0,0,0.45); z-index: 400;
-      align-items: center; justify-content: center; padding: 24px;
-    }
-    .hist-modal-overlay.show { display: flex; }
-    .hist-modal-box {
-      background: var(--white); border-radius: var(--radius);
-      width: 100%; max-width: 480px; max-height: 80vh;
-      display: flex; flex-direction: column;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.18);
-      animation: slideUp .25s ease;
-    }
-    .hist-modal-header {
-      padding: 18px 20px 14px; display: flex; align-items: center;
-      justify-content: space-between; border-bottom: 1px solid var(--border); flex-shrink: 0;
-    }
-    .hist-modal-title { font-size: 15px; font-weight: 800; color: var(--black); letter-spacing: -0.4px; }
-    .hist-modal-body { overflow-y: auto; flex: 1; padding: 8px 0; }
-    .hist-item {
-      padding: 12px 20px; border-bottom: 1px solid var(--gray-6);
-      cursor: pointer; transition: background .1s;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .hist-item:last-child { border-bottom: none; }
-    .hist-item:hover { background: var(--gray-6); }
-    .hist-item.active { background: #F0FDF6; }
-    .hist-item-time { font-size: 13px; font-weight: 700; color: var(--black); }
-    .hist-item-kws { font-size: 11px; color: var(--gray-3); margin-top: 2px; }
-    .hist-item-arrow { font-size: 12px; color: var(--gray-4); }
-
     /* ── 키워드 상세 모달 ── */
     .kw-detail-overlay {
       display: none; position: fixed; inset: 0;
@@ -611,16 +579,6 @@
   </div>
 </div>
 
-<!-- 히스토리 팝업 -->
-<div class="hist-modal-overlay" id="histModal" onclick="closeHistModal(event)">
-  <div class="hist-modal-box">
-    <div class="hist-modal-header">
-      <div class="hist-modal-title">📅 과거 차트 이력</div>
-      <button class="modal-close" onclick="closeHistModal()">✕</button>
-    </div>
-    <div class="hist-modal-body" id="histModalBody"></div>
-  </div>
-</div>
 
 <footer>
   <div class="footer-left">Powered by Naver Blog API · DataLab · HyperCLOVA X</div>
@@ -634,10 +592,8 @@
 <script>
 // ── 전역 상태 ──
 let globalKws = [];
-let globalHistory = [];
 let globalData = null;
 
-let activeHistoryIdx = -1;
 
 // ── 스파크라인 SVG ──
 function sparkline(values, width=72, height=28, isChecked=false) {
@@ -646,7 +602,7 @@ function sparkline(values, width=72, height=28, isChecked=false) {
       <line x1="0" y1="${height/2}" x2="${width}" y2="${height/2}" stroke="#E8E8E8" stroke-width="1.5" stroke-dasharray="3,3"/>
     </svg>`;
   }
-  const pts = values.slice(-14);
+  const pts = values.slice(-7); // 1주 기준
   const max = Math.max(...pts, 0.01);
   const min = Math.min(...pts);
   const range = max - min || 0.01;
@@ -738,7 +694,6 @@ async function loadData() {
         </div></div>`;
       return;
     }
-    loadHistory();
   } catch(e) {
     console.error('loadData 오류:', e);
     document.getElementById('leftCol').innerHTML = `
@@ -751,14 +706,7 @@ async function loadData() {
   }
 }
 
-async function loadHistory() {
-  try {
-    const res = await fetch('/api/data?detail=1');
-    if (!res.ok) return;
-    const data = await res.json();
-    globalHistory = data.history || [];
-    } catch(e) {}
-}
+
 
 async function manualRefresh() {
   const btn = document.getElementById('refreshBtn');
@@ -826,7 +774,7 @@ function buildMainContent() {
           <div class="card-title">실시간 랭킹</div>
           <div class="card-sub">네이버 블로그 트렌드 TOP 20</div>
         </div>
-        <button onclick="openHistModal()" style="height:28px;padding:0 10px;background:var(--gray-6);border:1px solid var(--border);border-radius:6px;font-size:11px;font-weight:600;color:var(--gray-3);cursor:pointer;font-family:Pretendard,sans-serif;">📅 이력</button>
+
       </div>
 
       <div class="rank-header-row">
@@ -1257,43 +1205,13 @@ function closePostsModal(e) {
 // ── 범례 ──
 
 // ── 히스토리 팝업 ──
-function openHistModal() {
-  const modal = document.getElementById('histModal');
-  const body = document.getElementById('histModalBody');
-  modal.classList.add('show');
-  document.body.style.overflow = 'hidden';
 
-  const allHistory = globalHistory.slice().reverse();
-  body.innerHTML = allHistory.map((h, i) => {
-    const origIdx = globalHistory.length - 1 - i;
-    const isActive = activeHistoryIdx === origIdx;
-    const top3 = h.keywords ? h.keywords.slice(0, 3).map(k => k.keyword).join(', ') : '';
-    return `<div class="hist-item${isActive ? ' active' : ''}" onclick="selectHistory(${origIdx})">
-      <div>
-        <div class="hist-item-time">${fmtHistLabel(h.timestamp, h.date)}</div>
-        <div class="hist-item-kws">1위: ${top3}</div>
-      </div>
-      <span class="hist-item-arrow">→</span>
-    </div>`;
-  }).join('');
-}
 
-function selectHistory(idx) {
-  // 히스토리 팝업은 단순 기록 열람용 - 차트 전환 없음
-  closeHistModal();
-}
-
-function closeHistModal(e) {
-  if (e && e.target !== document.getElementById('histModal')) return;
-  document.getElementById('histModal').classList.remove('show');
-  document.body.style.overflow = '';
-}
 
 // ESC 키로 모달 닫기
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     closePostsModal();
-    closeHistModal();
     closeKwDetail();
   }
 });
