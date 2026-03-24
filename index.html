@@ -1063,7 +1063,8 @@ function drawKwDetailChart(kw, days) {
 
   // 자기 자신 최고치 기준 정규화 (0~100)
   const maxVal = Math.max(...nonNull, 1);
-  const values = sliced.map(v => (v != null && v > 0) ? Math.round((v / maxVal) * 100) : null);
+  // null/0 구간 → 0으로 표시 (데이터 없는 구간도 0 기준선으로 연결)
+  const values = sliced.map(v => (v != null && v > 0) ? Math.round((v / maxVal) * 100) : 0);
 
   const labels = Array.from({length: days}, (_, i) => {
     const d = new Date(); d.setDate(d.getDate() - (days - 1 - i));
@@ -1113,7 +1114,7 @@ function drawKwDetailChart(kw, days) {
       pointHoverBackgroundColor: '#2DB400',
       tension: 0.35,
       fill: true,
-      spanGaps: false,
+      spanGaps: true,
     }]},
     options: {
       responsive: true, maintainAspectRatio: false,
@@ -1148,9 +1149,11 @@ function drawKwDetailChart(kw, days) {
           border: { color: 'transparent' }
         },
         y: {
-          min: 0,
+          min: -5,
+          max: 110,
           grid: { color: 'rgba(0,0,0,0.04)', drawBorder: false },
-          ticks: { color: '#BBBBBB', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 4, callback: v => v },
+          ticks: { color: '#BBBBBB', font: { size: 10, family: 'Pretendard' }, maxTicksLimit: 4,
+            callback: v => (v < 0 || v > 100) ? '' : v },
           border: { display: false }
         }
       }
@@ -1169,22 +1172,23 @@ function drawKwDetailChart(kw, days) {
         c.font = '700 10px Pretendard, sans-serif';
         const tw = c.measureText(label).width;
         const pw = tw + 16, ph = 20, pr = 10;
+        // 레이블 박스는 포인트 아래에 (위쪽 화살표)
         let bx = x - pw / 2;
         bx = Math.max(chartArea.left + 2, Math.min(bx, chartArea.right - pw - 2));
-        const by = Math.max(chartArea.top + 2, y - ph - 10);
+        const by = Math.min(chartArea.bottom - ph - 8, y + 14);
+        // 말풍선 위쪽 꼬리 (포인트를 위로 가리킴)
+        const tx = Math.min(Math.max(x, bx + 8), bx + pw - 8);
+        c.beginPath();
+        c.moveTo(tx - 4, by);
+        c.lineTo(tx + 4, by);
+        c.lineTo(tx, by - 5);
+        c.closePath();
+        c.fillStyle = '#2DB400';
+        c.fill();
         // 말풍선 배경
         c.beginPath();
         c.roundRect(bx, by, pw, ph, pr);
-        c.fillStyle = '#111111';
-        c.fill();
-        // 말풍선 꼬리
-        const tx = Math.min(Math.max(x, bx + 8), bx + pw - 8);
-        c.beginPath();
-        c.moveTo(tx - 4, by + ph);
-        c.lineTo(tx + 4, by + ph);
-        c.lineTo(tx, by + ph + 5);
-        c.closePath();
-        c.fillStyle = '#111111';
+        c.fillStyle = '#2DB400';
         c.fill();
         // 텍스트
         c.fillStyle = '#ffffff';
