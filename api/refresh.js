@@ -49,10 +49,16 @@ async function updateNetKeywords(risingWords) {
 이 단어들을 참고해서 내일 네이버 블로그에서 트렌드 콘텐츠를 많이 포함할 것 같은 검색 키워드 10개를 추천해줘.
 
 조건:
-- 블로그 검색 시 다양한 트렌드 콘텐츠가 나올 수 있는 일반적인 키워드
-- 너무 구체적인 제품명 말고 카테고리 수준 (예: "봄신상", "신메뉴", "핫플")
-- 오늘 급상승 단어와 연관된 카테고리 반영
-- 중복 없이 10개
+- 블로그 검색 시 다양한 트렌드 콘텐츠가 나올 수 있는 카테고리 수준 키워드
+- 오늘 급상승 단어와 연관된 카테고리/트렌드 반영 (예: "봄신상", "체리블라썸 음료", "봄 패션")
+- 반드시 카테고리/트렌드 수준이어야 함 (예: "나이키 신상", "스타벅스 봄메뉴", "편의점 신상과자")
+
+절대 추천하면 안 되는 것:
+- 연예인/인물 이름 (예: 강소라, 닥터신, 송지인, 블랙핑크)
+- 드라마/영화 제목 단독 (예: 눈물의 여왕, 닥터신)
+- 범용어 단독 (예: 추천템, 리뷰, 만들기, 일상)
+- 특정 제품 모델명 (예: 갤럭시S26 울트라 256GB)
+- 지역 맛집/카페명
 
 반드시 JSON 배열로만: ["키워드1","키워드2",...]
 다른 설명 없이 JSON만.`,
@@ -100,6 +106,9 @@ async function collectBlogTitles(netKeywords) {
   const seenRecent = new Set();
   const seenOlder = new Set();
 
+  // 교차 카테고리 감지를 위해 그물 키워드별 제목 추적
+  const titlesPerKeyword = {}; // { keyword: [title, ...] }
+
   for (const keyword of netKeywords) {
     await sleep(100);
     try {
@@ -112,6 +121,7 @@ async function collectBlogTitles(netKeywords) {
       });
       const data = await res.json();
       if (data.items) {
+        titlesPerKeyword[keyword] = [];
         data.items.forEach((item, idx) => {
           const title = item.title
             .replace(/<[^>]+>/g, '')
@@ -120,7 +130,7 @@ async function collectBlogTitles(netKeywords) {
             .replace(/&apos;/g, "'").replace(/&#(\d+);/g, (_, c) => String.fromCharCode(c))
             .trim();
 
-          // 앞 50개 = 최근 3일, 뒤 50개 = 이전 3일
+          titlesPerKeyword[keyword].push(title);
           if (idx < 50) {
             if (!seenRecent.has(title)) { seenRecent.add(title); recentTitles.push(title); }
           } else {
@@ -198,10 +208,152 @@ async function collectBlogTitles(netKeywords) {
     .slice(0, 30)
     .map(([word]) => word);
 
+  // ── 밈/신조어 감지: n-gram + 교차 카테고리 분석 ──
+  // n-gram: 제목에서 2~5자 한글 연속 조각 빈도 계산
+  const ngramFreq = {}; // { ngram: { recent: N, older: N, categories: Set } }
+
+  const extractNgrams = (title, keywordCat, isRecent) => {
+    // 한글 연속 구간 추출
+    const korSegments = title.match(/[가-힣]+/g) || [];
+    for (const seg of korSegments) {
+      // 2~5자 n-gram
+      for (let len = 2; len <= Math.min(5, seg.length); len++) {
+        for (let j = 0; j <= seg.length - len; j++) {
+          const gram = seg.slice(j, j + len);
+          if (!ngramFreq[gram]) ngramFreq[gram] = { recent: 0, older: 0, categories: new Set() };
+          if (isRecent) ngramFreq[gram].recent++;
+          else ngramFreq[gram].older++;
+          ngramFreq[gram].categories.add(keywordCat);
+        }
+      }
+    }
+  };
+
+  // 최근 3일 제목에서 n-gram 추출 (카테고리별)
+  for (const [kw, titles] of Object.entries(titlesPerKeyword)) {
+    titles.forEach((title, idx) => {
+      const isRecent = idx < 50;
+      extractNgrams(title, kw, isRecent);
+    });
+  }
+
+  // 일반 한국어 단어 필터 (사전에 있을 법한 일반적 표현 제외)
+  const COMMON_GRAMS = new Set([
+    '오늘', '내일', '어제', '이번', '지난', '우리', '그냥', '진짜', '정말', '너무',
+    '하는', '있는', '없는', '하고', '이고', '하면', '이면', '하지', '않은', '않고',
+    '이렇', '저렇', '그렇', '어떻', '이런', '저런', '그런', '어떤', '모든', '모두',
+    '아직', '벌써', '드디어', '역시', '또한', '그리고', '그래서', '하지만', '근데',
+    '구매', '사용', '리뷰', '후기', '추천', '할인', '이벤트', '신상', '최근', '요즘',
+  ]);
+
+  // 밈 후보: 교차 카테고리 3개 이상 + 최근 급등 + 일반어 아님
+  const mimeCandidates = Object.entries(ngramFreq)
+    .filter(([gram, data]) => {
+      if (COMMON_GRAMS.has(gram)) return false;
+      if (data.recent < 5) return false; // 최소 5회 이상 등장
+      if (data.categories.size < 3) return false; // 3개 이상 카테고리
+      const older = data.older || 0;
+      // 이전 3일 대비 3배 이상 급등 (또는 완전 신규)
+      if (older === 0) return data.recent >= 5;
+      return (data.recent / older) >= 3;
+    })
+    .sort((a, b) => {
+      // 교차 카테고리 수 × 급등률로 정렬
+      const scoreA = a[1].categories.size * (a[1].recent / (a[1].older || 0.5));
+      const scoreB = b[1].categories.size * (b[1].recent / (b[1].older || 0.5));
+      return scoreB - scoreA;
+    })
+    .slice(0, 10)
+    .map(([gram, data]) => ({
+      word: gram,
+      recent: data.recent,
+      older: data.older,
+      categories: data.categories.size,
+    }));
+
+  if (mimeCandidates.length > 0) {
+    console.log('[mimeDetect] 밈/신조어 후보:', mimeCandidates.map(m => `${m.word}(${m.recent}회,${m.categories}카테고리)`));
+  }
+
   console.log(`[collectBlogTitles] 총 ${filtered.length}개 수집 (최근3일: ${filteredRecent.length}개, 이전3일: ${filteredOlder.length}개)`);
   console.log(`[collectBlogTitles] 급상승 단어 TOP10:`, risingWords.slice(0, 10));
 
-  return { titles: filtered, risingWords };
+  return { titles: filtered, risingWords, mimeCandidates };
+}
+
+// ─────────────────────────────────────────
+// Step 2-1: HCX 기반 밈/신조어 감지 (형태 무관)
+// ─────────────────────────────────────────
+async function detectMimicPatterns(recentTitles, mimeCandidates = []) {
+  if (!recentTitles || recentTitles.length < 20) return [];
+  try {
+    // n-gram 후보 단어 힌트 추가
+    const candidateHint = mimeCandidates.length > 0
+      ? `\n\n[통계 힌트] 최근 블로그 제목에서 갑자기 급증한 표현들이야. 이 중 밈/신조어로 보이는 게 있으면 우선 포함해:\n${mimeCandidates.map(m => m.word).join(', ')}`
+      : '';
+
+    // 최근 제목 300개 샘플 (토큰 절약)
+    const sample = recentTitles
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 300);
+
+    const res = await fetch(
+      'https://clovastudio.stream.ntruss.com/v3/chat-completions/HCX-007',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.CLOVA_API_KEY}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [
+            {
+              role: 'system',
+              content: `너는 한국 인터넷 밈과 신조어에 민감한 트렌드 감지 전문가야.
+아래 최근 네이버 블로그 제목들을 읽고, 여러 제목에 반복 등장하는 낯선 표현을 찾아줘.
+
+찾아야 할 것 (형태 무관):
+- 표준 사전에 없는 신조어 (예: 영크크, 킹받다, 갓생)
+- 특이한 문장 패턴/어미 (예: "~실화냐", "~인 척", "OO했는데 OO됨")
+- 갑자기 여러 블로그에 퍼진 표현 (패션/음식/일상 등 다양한 주제에 동시 등장)
+- 의미를 정확히 몰라도 됨, 낯설고 반복 등장하면 감지
+
+찾으면 안 되는 것:
+- 일반 한국어 단어 (레시피, 후기, 일상, 추천)
+- 브랜드명, 제품명, 연예인 이름
+- 뉴스성 키워드 (사고, 날씨, 정치)
+- 오래된 유행어 (갓생, 무지출 등 이미 일반화된 표현)
+
+5개 이하로만. 없으면 빈 배열.
+반드시 JSON 배열로만: ["표현1","표현2",...]
+다른 설명 없이 JSON만.`,
+            },
+            {
+              role: 'user',
+              content: sample.join('\n') + candidateHint,
+            },
+          ],
+          maxCompletionTokens: 200,
+          temperature: 0.3,
+          thinking: { effort: 'none' },
+        }),
+      }
+    );
+    const data = await res.json();
+    const raw = data.result?.message?.content || '[]';
+    let text = raw.replace(/```json|```/g, '').trim();
+    const arrMatch = text.match(/\[[\s\S]*\]/);
+    text = arrMatch ? arrMatch[0] : '[]';
+    const memes = JSON.parse(text);
+    if (Array.isArray(memes) && memes.length > 0) {
+      console.log('[detectMimic] 밈/신조어 감지:', memes);
+    }
+    return Array.isArray(memes) ? memes.filter(m => typeof m === 'string' && m.length >= 2) : [];
+  } catch(e) {
+    console.log('[detectMimic] 실패:', e.message);
+    return [];
+  }
 }
 
 // ─────────────────────────────────────────
@@ -916,13 +1068,28 @@ module.exports = async (req, res) => {
   try {
     const today = getDateString(0);
     const netKeywords = await loadNetKeywords();
-    const { titles: allTitles, risingWords } = await collectBlogTitles(netKeywords);
+    const { titles: allTitles, risingWords, mimeCandidates } = await collectBlogTitles(netKeywords);
+
+    // Step 2-1: 밈/신조어 감지 (형태 무관, HCX 1회)
+    const memeKeywords = await detectMimicPatterns(
+      allTitles.slice(0, 600), // 최근 제목 샘플
+      mimeCandidates
+    );
     if (!allTitles.length) throw new Error('블로그 제목 수집 실패');
 
     const refined = await extractTrendKeywords(allTitles, risingWords);
     if (!refined.length) throw new Error('키워드 추출 실패');
 
-    const keywordPool = await updateKeywordPool(refined);
+    // 밈 키워드를 pool에 추가 (중복 제외, isMemetic 플래그)
+    const memeOnlyNew = memeKeywords.filter(m =>
+      !refined.includes(m) && m.length >= 2
+    );
+    if (memeOnlyNew.length > 0) {
+      console.log('[detectMimic] pool 추가 대상:', memeOnlyNew);
+    }
+    const refinedWithMeme = [...refined, ...memeOnlyNew];
+
+    const keywordPool = await updateKeywordPool(refinedWithMeme);
     if (!keywordPool.length) throw new Error('키워드 풀 없음');
 
     // pool 앞 40개 포스팅 수 조회 → 50만 초과 제거 → 중복 제거 → DataLab 조회
@@ -1145,6 +1312,7 @@ module.exports = async (req, res) => {
         category: k.category || '',
         trend: k.trend,
         isNew: k.isNew,
+        isMemetic: memeKeywords.includes(originalKeywords[i]) || memeKeywords.includes(k.keyword),
         comment: comments[i] || '',
         values: k.values.slice(-28),
         scoreValues: [Math.round(k.score * 100)], // score_history 누적 후 rank.js에서 확장

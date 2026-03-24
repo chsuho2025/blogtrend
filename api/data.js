@@ -35,6 +35,7 @@ module.exports = async (req, res) => {
         trend: k.trend || '유행중',
         isNew: k.isNew || false,
         isEarlyTrend: k.isEarlyTrend || false,
+        isMemetic: k.isMemetic || false,
         earlyScore: k.earlyScore || 0,
         comment: k.comment || '',
         values: k.values || [],
