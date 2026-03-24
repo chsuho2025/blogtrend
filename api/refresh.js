@@ -822,7 +822,9 @@ async function getSearchTrends(keywords) {
     chunks.push(keywords.slice(i, i + 5));
   }
 
-  const chunkResults = await Promise.all(chunks.map(async (chunk, ci) => {
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  const fetchChunk = async (chunk, ci, retry = 0) => {
     const keywordGroups = chunk.map(kw => ({ groupName: kw, keywords: [kw] }));
     try {
       const res = await fetch('https://openapi.naver.com/v1/datalab/search', {
@@ -842,21 +844,35 @@ async function getSearchTrends(keywords) {
       const data = await res.json();
       if (data.results) {
         return data.results.map(result => {
-          const values = result.data.map(d => d.ratio);
+          const values = result.data ? result.data.map(d => d.ratio) : [];
           const recent7 = values.slice(-7);
           const prev7 = values.slice(-14, -7);
           const weeklyRate = avg(prev7) > 0 ? ((avg(recent7) - avg(prev7)) / avg(prev7)) * 100 : 0;
           const recent3 = values.slice(-3);
           const prev3 = values.slice(-6, -3);
           const risingRate = avg(prev3) > 0 ? ((avg(recent3) - avg(prev3)) / avg(prev3)) * 100 : 0;
+          if (values.length === 0) console.log(`[getSearchTrends] values 없음: ${result.title}`);
           return { keyword: result.title, weeklyRate, risingRate, values };
         });
       }
+      // results 없으면 재시도
+      if (retry < 2) {
+        console.log(`[getSearchTrends] chunk ${ci} results 없음 → 재시도 ${retry + 1}`);
+        await sleep(500);
+        return fetchChunk(chunk, ci, retry + 1);
+      }
+      console.log(`[getSearchTrends] chunk ${ci} 최종 실패:`, JSON.stringify(data).slice(0, 200));
     } catch (e) {
+      if (retry < 2) {
+        await sleep(500);
+        return fetchChunk(chunk, ci, retry + 1);
+      }
       console.log('[getSearchTrends] chunk 오류', ci, e.message);
     }
     return [];
-  }));
+  };
+
+  const chunkResults = await Promise.all(chunks.map((chunk, ci) => fetchChunk(chunk, ci)));
 
   return chunkResults.flat();
 }
@@ -1208,11 +1224,11 @@ module.exports = async (req, res) => {
       console.log('[blogSurge] 급등 키워드:', Object.keys(postHistoryMap));
 
       await redis.set('refresh_step2', JSON.stringify({
-        allTitles,
+        // allTitles는 step1에 저장됨 (용량 절감)
         risingWords,
         memeKeywords,
         keywordPool,
-        rawTrends,
+        rawTrends: rawTrends.map(t => ({ ...t, values: (t.values || []).slice(-28) })),
         poolPostMap,
         poolPostNormMap,
         postHistoryMap,
@@ -1230,7 +1246,16 @@ module.exports = async (req, res) => {
       const s2Raw = await redis.get('refresh_step2');
       if (!s2Raw) throw new Error('step2 데이터 없음. step=2 먼저 실행 필요');
       const s2 = typeof s2Raw === 'string' ? JSON.parse(s2Raw) : s2Raw;
-      const { allTitles, risingWords, memeKeywords, keywordPool, rawTrends, poolPostMap, poolPostNormMap, postHistoryMap, dedupedPool } = s2;
+      const { risingWords, memeKeywords, keywordPool, rawTrends, poolPostMap, poolPostNormMap, postHistoryMap, dedupedPool } = s2;
+      // allTitles는 step1 데이터에서 읽어옴
+      let allTitles = [];
+      try {
+        const s1Raw = await redis.get('refresh_step1');
+        if (s1Raw) {
+          const s1 = typeof s1Raw === 'string' ? JSON.parse(s1Raw) : s1Raw;
+          allTitles = s1.allTitles || [];
+        }
+      } catch(e) { console.log('[step3] allTitles 로드 실패:', e.message); }
 
       const postValues2 = dedupedPool.map(kw => poolPostMap[kw]).filter(v => v != null);
       const medianPost = postValues2.length ? median(postValues2) : 0;
