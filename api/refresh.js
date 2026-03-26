@@ -366,7 +366,7 @@ async function detectMimicPatterns(recentTitles, mimeCandidates = []) {
 // ─────────────────────────────────────────
 async function extractTrendKeywords(titles, risingWords = []) {
   const CHUNK_SIZE = 400;
-  const allKeywords = [];
+  let allKeywords = [];
 
   // 급상승 단어를 system 프롬프트에 컨텍스트로 통합 (user 메시지 오염 방지)
   const risingContext = risingWords.length > 0
