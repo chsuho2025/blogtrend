@@ -1390,11 +1390,13 @@ module.exports = async (req, res) => {
       const comments = finalRanked.map((_, i) => commentsRaw[String(i)] || '');
 
       let prevRankMap = {};
+      let prevAddedAtMap = {}; // 이전 랭킹에서 addedAt 이어받기
       try {
         const prevRaw = await redis.get('trend_data');
         if (prevRaw) {
           const prevData = typeof prevRaw === 'string' ? JSON.parse(prevRaw) : prevRaw;
           prevRankMap = Object.fromEntries((prevData.keywords || []).map(k => [k.keyword, k.rank]));
+          prevAddedAtMap = Object.fromEntries((prevData.keywords || []).filter(k => k.addedAt).map(k => [k.keyword, k.addedAt]));
         }
       } catch(e) {}
 
@@ -1404,7 +1406,10 @@ module.exports = async (req, res) => {
           rank: i + 1, prevRank: prevRankMap[k.keyword] || null, keyword: k.keyword,
           score: Math.round(k.score * 100), changeRate: Math.round(k.changeRate), risingRate: Math.round(k.risingRate),
           postCount: k.postCount, blogSurgeRate: k.blogSurgeRate || 0, blogSurge: k.blogSurge || false,
-          category: k.category || '', trend: k.trend, isNew: k.isNew,
+          category: k.category || '', trend: k.trend,
+          // addedAt: 이전 랭킹에 있던 키워드면 기존 날짜 유지, 신규면 오늘
+          addedAt: prevAddedAtMap[k.keyword] || k.addedAt || today,
+          isNew: k.isNew && !prevAddedAtMap[k.keyword], // 이전 랭킹에 있던 키워드는 NEW 아님
           isMemetic: memeKeywords.includes(originalKeywords[i]) || memeKeywords.includes(k.keyword),
           comment: comments[i] || '', values: k.values.slice(-28),
           scoreValues: [Math.round(k.score * 100)],
